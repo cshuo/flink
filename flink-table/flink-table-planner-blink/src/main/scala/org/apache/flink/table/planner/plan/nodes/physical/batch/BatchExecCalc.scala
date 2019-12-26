@@ -18,6 +18,9 @@
 
 package org.apache.flink.table.planner.plan.nodes.physical.batch
 
+import java.util
+
+import com.google.common.collect.ImmutableList
 import org.apache.flink.api.dag.Transformation
 import org.apache.flink.table.dataformat.BaseRow
 import org.apache.flink.table.planner.calcite.FlinkTypeFactory
@@ -25,11 +28,11 @@ import org.apache.flink.table.planner.codegen.{CalcCodeGenerator, CodeGeneratorC
 import org.apache.flink.table.planner.delegation.BatchPlanner
 import org.apache.flink.table.planner.plan.nodes.exec.ExecNode
 import org.apache.flink.table.runtime.typeutils.BaseRowTypeInfo
-
 import org.apache.calcite.plan._
 import org.apache.calcite.rel._
 import org.apache.calcite.rel.`type`.RelDataType
 import org.apache.calcite.rel.core.Calc
+import org.apache.calcite.rel.hint.RelHint
 import org.apache.calcite.rex.RexProgram
 
 /**
@@ -39,12 +42,23 @@ class BatchExecCalc(
     cluster: RelOptCluster,
     traitSet: RelTraitSet,
     inputRel: RelNode,
+    hints: ImmutableList[RelHint],
     calcProgram: RexProgram,
     outputRowType: RelDataType)
-  extends BatchExecCalcBase(cluster, traitSet, inputRel, calcProgram, outputRowType) {
+  extends BatchExecCalcBase(cluster, traitSet, inputRel, hints, calcProgram, outputRowType) {
 
   override def copy(traitSet: RelTraitSet, child: RelNode, program: RexProgram): Calc = {
-    new BatchExecCalc(cluster, traitSet, child, program, outputRowType)
+    new BatchExecCalc(cluster, traitSet, child, hints, program, outputRowType)
+  }
+
+  override def withHints(hints: util.List[RelHint]): RelNode = {
+    new BatchExecCalc(
+      cluster,
+      traitSet,
+      inputRel,
+      ImmutableList.copyOf(hints.iterator()),
+      calcProgram,
+      outputRowType)
   }
 
   override protected def translateToPlanInternal(

@@ -32,14 +32,15 @@ import org.apache.flink.table.runtime.operators.aggregate.MiniBatchIncrementalGr
 import org.apache.flink.table.runtime.operators.bundle.KeyedMapBundleOperator
 import org.apache.flink.table.runtime.typeutils.BaseRowTypeInfo
 import org.apache.flink.table.types.DataType
-
 import org.apache.calcite.plan.{RelOptCluster, RelTraitSet}
 import org.apache.calcite.rel.`type`.RelDataType
 import org.apache.calcite.rel.core.AggregateCall
 import org.apache.calcite.rel.{RelNode, RelWriter}
 import org.apache.calcite.tools.RelBuilder
-
 import java.util
+
+import com.google.common.collect.ImmutableList
+import org.apache.calcite.rel.hint.RelHint
 
 import scala.collection.JavaConversions._
 
@@ -75,12 +76,13 @@ class StreamExecIncrementalGroupAggregate(
     inputRel: RelNode,
     inputRowType: RelDataType,
     outputRowType: RelDataType,
+    hints: ImmutableList[RelHint],
     val partialAggInfoList: AggregateInfoList,
     finalAggInfoList: AggregateInfoList,
     val finalAggCalls: Seq[AggregateCall],
     val finalAggGrouping: Array[Int],
     val partialAggGrouping: Array[Int])
-  extends StreamExecGroupAggregateBase(cluster, traitSet, inputRel)
+  extends StreamExecGroupAggregateBase(cluster, traitSet, hints, inputRel)
   with StreamExecNode[BaseRow] {
 
   override def deriveRowType(): RelDataType = outputRowType
@@ -102,6 +104,22 @@ class StreamExecIncrementalGroupAggregate(
       inputs.get(0),
       inputRowType,
       outputRowType,
+      hints,
+      partialAggInfoList,
+      finalAggInfoList,
+      finalAggCalls,
+      finalAggGrouping,
+      partialAggGrouping)
+  }
+
+  override def withHints(hintList: util.List[RelHint]): RelNode = {
+    new StreamExecIncrementalGroupAggregate(
+      cluster,
+      traitSet,
+      inputRel,
+      inputRowType,
+      outputRowType,
+      ImmutableList.copyOf(hintList.iterator()),
       partialAggInfoList,
       finalAggInfoList,
       finalAggCalls,

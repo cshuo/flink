@@ -32,13 +32,14 @@ import org.apache.flink.table.planner.plan.utils.{KeySelectorUtil, _}
 import org.apache.flink.table.runtime.operators.aggregate.MiniBatchLocalGroupAggFunction
 import org.apache.flink.table.runtime.operators.bundle.MapBundleOperator
 import org.apache.flink.table.runtime.typeutils.BaseRowTypeInfo
-
 import org.apache.calcite.plan.{RelOptCluster, RelTraitSet}
 import org.apache.calcite.rel.`type`.RelDataType
 import org.apache.calcite.rel.core.AggregateCall
 import org.apache.calcite.rel.{RelNode, RelWriter}
-
 import java.util
+
+import com.google.common.collect.ImmutableList
+import org.apache.calcite.rel.hint.RelHint
 
 import scala.collection.JavaConversions._
 
@@ -52,11 +53,12 @@ class StreamExecLocalGroupAggregate(
     traitSet: RelTraitSet,
     inputRel: RelNode,
     outputRowType: RelDataType,
+    hints: ImmutableList[RelHint],
     val grouping: Array[Int],
     val aggCalls: Seq[AggregateCall],
     val aggInfoList: AggregateInfoList,
     val partialFinalType: PartialFinalType)
-  extends StreamExecGroupAggregateBase(cluster, traitSet, inputRel)
+  extends StreamExecGroupAggregateBase(cluster, traitSet, hints, inputRel)
   with StreamExecNode[BaseRow] {
 
   override def producesUpdates = false
@@ -77,6 +79,20 @@ class StreamExecLocalGroupAggregate(
       traitSet,
       inputs.get(0),
       outputRowType,
+      hints,
+      grouping,
+      aggCalls,
+      aggInfoList,
+      partialFinalType)
+  }
+
+  override def withHints(hintList: util.List[RelHint]): RelNode = {
+    new StreamExecLocalGroupAggregate(
+      cluster,
+      traitSet,
+      inputRel,
+      outputRowType,
+      hints,
       grouping,
       aggCalls,
       aggInfoList,

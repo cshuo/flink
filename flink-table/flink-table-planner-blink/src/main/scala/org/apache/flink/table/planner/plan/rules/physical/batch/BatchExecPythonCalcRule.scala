@@ -53,6 +53,7 @@ class BatchExecPythonCalcRule
       rel.getCluster,
       newTrait,
       newInput,
+      calc.getHints,
       calc.getProgram,
       rel.getRowType)
   }

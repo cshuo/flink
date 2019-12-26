@@ -20,10 +20,12 @@ package org.apache.flink.table.planner.plan.nodes.physical.stream
 
 import java.util
 
+import com.google.common.collect.ImmutableList
 import org.apache.calcite.plan.{RelOptCluster, RelTraitSet}
 import org.apache.calcite.rel.RelNode
 import org.apache.calcite.rel.`type`.RelDataType
 import org.apache.calcite.rel.core.Calc
+import org.apache.calcite.rel.hint.RelHint
 import org.apache.calcite.rex.RexProgram
 import org.apache.flink.table.dataformat.BaseRow
 import org.apache.flink.table.planner.delegation.StreamPlanner
@@ -39,9 +41,10 @@ abstract class StreamExecCalcBase(
     cluster: RelOptCluster,
     traitSet: RelTraitSet,
     inputRel: RelNode,
+    hints: ImmutableList[RelHint],
     calcProgram: RexProgram,
     outputRowType: RelDataType)
-  extends CommonCalc(cluster, traitSet, inputRel, calcProgram)
+  extends CommonCalc(cluster, traitSet, inputRel, hints, calcProgram)
   with StreamPhysicalRel
   with StreamExecNode[BaseRow] {
 

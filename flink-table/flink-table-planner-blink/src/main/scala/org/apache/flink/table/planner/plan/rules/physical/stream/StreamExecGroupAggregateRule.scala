@@ -70,6 +70,7 @@ class StreamExecGroupAggregateRule
       providedTraitSet,
       newInput,
       rel.getRowType,
+      agg.getHints,
       agg.getGroupSet.toArray,
       agg.getAggCallList,
       agg.partialFinalType)

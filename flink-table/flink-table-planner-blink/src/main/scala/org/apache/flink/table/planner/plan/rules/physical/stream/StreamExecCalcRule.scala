@@ -53,6 +53,7 @@ class StreamExecCalcRule
       rel.getCluster,
       traitSet,
       newInput,
+      calc.getHints,
       calc.getProgram,
       rel.getRowType)
   }

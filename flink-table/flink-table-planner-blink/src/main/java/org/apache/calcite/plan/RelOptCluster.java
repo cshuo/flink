@@ -18,6 +18,7 @@ package org.apache.calcite.plan;
 
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.CorrelationId;
+import org.apache.calcite.rel.hint.HintStrategyTable;
 import org.apache.calcite.rel.metadata.DefaultRelMetadataProvider;
 import org.apache.calcite.rel.metadata.MetadataFactory;
 import org.apache.calcite.rel.metadata.MetadataFactoryImpl;
@@ -56,6 +57,7 @@ public class RelOptCluster {
 	private final RexBuilder rexBuilder;
 	private RelMetadataProvider metadataProvider;
 	private MetadataFactory metadataFactory;
+	private HintStrategyTable hintStrategies;
 	private final RelTraitSet emptyTraitSet;
 	private RelMetadataQuery mq;
 
@@ -169,6 +171,34 @@ public class RelOptCluster {
 	 */
 	public void invalidateMetadataQuery() {
 		mq = null;
+	}
+
+	/**
+	 * Setup the hint propagation strategies to be used during rule planning.
+	 *
+	 * <p>Use <code>RelOptNode.getCluster().getHintStrategies()</code> to fetch
+	 * the hint strategies.
+	 *
+	 * <p>Note that this method is only for internal use, the cluster {@code hintStrategies}
+	 * would be always set up with the instance configured by
+	 * {@link org.apache.calcite.sql2rel.SqlToRelConverter.ConfigBuilder}.
+	 *
+	 * @param hintStrategies The specified hint strategies to override the default one(empty)
+	 */
+	public RelOptCluster withHintStrategies(HintStrategyTable hintStrategies) {
+		Objects.requireNonNull(hintStrategies);
+		this.hintStrategies = hintStrategies;
+		return this;
+	}
+
+	/**
+	 * Returns the hint strategies of this cluster. It is immutable during the whole planning phrase.
+	 */
+	public HintStrategyTable getHintStrategies() {
+		if (this.hintStrategies == null) {
+			this.hintStrategies = HintStrategyTable.EMPTY;
+		}
+		return this.hintStrategies;
 	}
 
 	/**

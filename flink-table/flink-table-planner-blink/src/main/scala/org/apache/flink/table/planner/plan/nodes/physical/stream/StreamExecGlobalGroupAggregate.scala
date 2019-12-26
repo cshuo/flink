@@ -36,13 +36,14 @@ import org.apache.flink.table.runtime.operators.bundle.KeyedMapBundleOperator
 import org.apache.flink.table.runtime.types.LogicalTypeDataTypeConverter.fromDataTypeToLogicalType
 import org.apache.flink.table.runtime.typeutils.BaseRowTypeInfo
 import org.apache.flink.table.types.DataType
-
 import org.apache.calcite.plan.{RelOptCluster, RelTraitSet}
 import org.apache.calcite.rel.`type`.RelDataType
 import org.apache.calcite.rel.{RelNode, RelWriter}
 import org.apache.calcite.tools.RelBuilder
-
 import java.util
+
+import com.google.common.collect.ImmutableList
+import org.apache.calcite.rel.hint.RelHint
 
 import scala.collection.JavaConversions._
 
@@ -57,11 +58,12 @@ class StreamExecGlobalGroupAggregate(
     inputRel: RelNode,
     val inputRowType: RelDataType,
     outputRowType: RelDataType,
+    hints: ImmutableList[RelHint],
     val grouping: Array[Int],
     val localAggInfoList: AggregateInfoList,
     val globalAggInfoList: AggregateInfoList,
     val partialFinalType: PartialFinalType)
-  extends StreamExecGroupAggregateBase(cluster, traitSet, inputRel)
+  extends StreamExecGroupAggregateBase(cluster, traitSet, hints, inputRel)
   with StreamExecNode[BaseRow] {
 
   override def producesUpdates = true
@@ -83,6 +85,21 @@ class StreamExecGlobalGroupAggregate(
       inputs.get(0),
       inputRowType,
       outputRowType,
+      hints,
+      grouping,
+      localAggInfoList,
+      globalAggInfoList,
+      partialFinalType)
+  }
+
+  override def withHints(hintList: util.List[RelHint]): RelNode = {
+    new StreamExecGlobalGroupAggregate(
+      cluster,
+      traitSet,
+      inputRel,
+      inputRowType,
+      outputRowType,
+      ImmutableList.copyOf(hintList.iterator()),
       grouping,
       localAggInfoList,
       globalAggInfoList,

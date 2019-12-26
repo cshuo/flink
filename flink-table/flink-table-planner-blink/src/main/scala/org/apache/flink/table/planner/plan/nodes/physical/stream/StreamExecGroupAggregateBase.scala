@@ -18,8 +18,10 @@
 
 package org.apache.flink.table.planner.plan.nodes.physical.stream
 
+import com.google.common.collect.ImmutableList
 import org.apache.calcite.plan.{RelOptCluster, RelTraitSet}
 import org.apache.calcite.rel.core.Aggregate
+import org.apache.calcite.rel.hint.{Hintable, RelHint}
 import org.apache.calcite.rel.{RelNode, SingleRel}
 
 /**
@@ -47,8 +49,11 @@ import org.apache.calcite.rel.{RelNode, SingleRel}
 abstract class StreamExecGroupAggregateBase(
     cluster: RelOptCluster,
     traitSet: RelTraitSet,
+    hints: ImmutableList[RelHint],
     inputRel: RelNode)
   extends SingleRel(cluster, traitSet, inputRel)
-  with StreamPhysicalRel {
+  with StreamPhysicalRel
+  with Hintable {
 
+  override def getHints: ImmutableList[RelHint] = hints
 }

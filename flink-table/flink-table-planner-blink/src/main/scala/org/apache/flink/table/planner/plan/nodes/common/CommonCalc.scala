@@ -18,11 +18,13 @@
 
 package org.apache.flink.table.planner.plan.nodes.common
 
+import com.google.common.collect.ImmutableList
 import org.apache.flink.table.planner.plan.nodes.ExpressionFormat.ExpressionFormat
 import org.apache.flink.table.planner.plan.nodes.{ExpressionFormat, FlinkRelNode}
 import org.apache.flink.table.planner.plan.utils.RelExplainUtil.{conditionToString, preferExpressionFormat}
 import org.apache.calcite.plan.{RelOptCluster, RelOptCost, RelOptPlanner, RelTraitSet}
 import org.apache.calcite.rel.core.Calc
+import org.apache.calcite.rel.hint.{Hintable, RelHint}
 import org.apache.calcite.rel.metadata.RelMetadataQuery
 import org.apache.calcite.rel.{RelNode, RelWriter}
 import org.apache.calcite.rex.{RexCall, RexInputRef, RexLiteral, RexProgram}
@@ -36,8 +38,9 @@ abstract class CommonCalc(
     cluster: RelOptCluster,
     traitSet: RelTraitSet,
     input: RelNode,
+    hints: ImmutableList[RelHint],
     calcProgram: RexProgram)
-  extends Calc(cluster, traitSet, input, calcProgram)
+  extends Calc(cluster, traitSet, hints, input, calcProgram)
   with FlinkRelNode {
 
   override def computeSelfCost(planner: RelOptPlanner, mq: RelMetadataQuery): RelOptCost = {

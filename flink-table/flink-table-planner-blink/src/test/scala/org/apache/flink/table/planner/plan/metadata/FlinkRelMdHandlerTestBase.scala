@@ -638,6 +638,7 @@ class FlinkRelMdHandlerTestBase {
       cluster,
       streamPhysicalTraits,
       firstRow,
+      ImmutableList.of(),
       projectProgram,
       projectProgram.getOutputRowType
     )
@@ -656,6 +657,7 @@ class FlinkRelMdHandlerTestBase {
       cluster,
       streamPhysicalTraits,
       lastRow,
+      ImmutableList.of(),
       projectProgram,
       projectProgram.getOutputRowType
     )
@@ -815,7 +817,8 @@ class FlinkRelMdHandlerTestBase {
     val flinkLogicalWindowAgg = new FlinkLogicalWindowTableAggregate(
       ts.getCluster,
       logicalTraits,
-      new FlinkLogicalCalc(ts.getCluster, flinkLogicalTraits, flinkLogicalTs, program),
+      new FlinkLogicalCalc(
+        ts.getCluster, flinkLogicalTraits, flinkLogicalTs, ImmutableList.of(), program),
       ImmutableBitSet.of(1),
       ImmutableList.of(ImmutableBitSet.of(1)),
       aggCallOfWindowAgg,
@@ -827,7 +830,8 @@ class FlinkRelMdHandlerTestBase {
     val streamTs: StreamExecDataStreamScan =
       createDataStreamScan(ImmutableList.of("TemporalTable1"), streamPhysicalTraits)
     val streamCalc = new BatchExecCalc(
-      cluster, streamPhysicalTraits, streamTs, program, program.getOutputRowType)
+      cluster, streamPhysicalTraits, streamTs,
+      ImmutableList.of(), program, program.getOutputRowType)
     val streamExchange = new StreamExecExchange(
       cluster, streamPhysicalTraits.replace(hash01), streamCalc, hash01)
     val emitStrategy = WindowEmitStrategy(tableConfig, tumblingGroupWindow)
@@ -878,10 +882,10 @@ class FlinkRelMdHandlerTestBase {
       cluster,
       flinkLogicalTraits,
       studentFlinkLogicalScan,
+      ImmutableList.of(),
       logicalAgg.getGroupSet,
       logicalAgg.getGroupSets,
-      logicalAgg.getAggCallList
-    )
+      logicalAgg.getAggCallList)
 
     val aggCalls = logicalAgg.getAggCallList
     val aggFunctionFactory = new AggFunctionFactory(
@@ -964,6 +968,7 @@ class FlinkRelMdHandlerTestBase {
       streamPhysicalTraits,
       studentStreamScan,
       rowTypeOfLocalAgg,
+      ImmutableList.of(),
       Array(3),
       aggCalls,
       localAggInfoList,
@@ -983,6 +988,7 @@ class FlinkRelMdHandlerTestBase {
       streamExchange1,
       streamExchange1.getRowType,
       rowTypeOfGlobalAgg,
+      ImmutableList.of(),
       Array(0),
       localAggInfoList,
       globalAggInfoList,
@@ -995,6 +1001,7 @@ class FlinkRelMdHandlerTestBase {
       streamPhysicalTraits,
       streamExchange2,
       rowTypeOfGlobalAgg,
+      ImmutableList.of(),
       Array(3),
       aggCalls)
 
@@ -1027,10 +1034,10 @@ class FlinkRelMdHandlerTestBase {
       cluster,
       flinkLogicalTraits,
       studentFlinkLogicalScan,
+      ImmutableList.of(),
       logicalAggWithAuxGroup.getGroupSet,
       logicalAggWithAuxGroup.getGroupSets,
-      logicalAggWithAuxGroup.getAggCallList
-    )
+      logicalAggWithAuxGroup.getAggCallList)
 
     val aggCalls = logicalAggWithAuxGroup.getAggCallList.filter {
       call => call.getAggregation != FlinkSqlOperatorTable.AUXILIARY_GROUP
@@ -1163,7 +1170,8 @@ class FlinkRelMdHandlerTestBase {
     val flinkLogicalWindowAgg = new FlinkLogicalWindowAggregate(
       ts.getCluster,
       logicalTraits,
-      new FlinkLogicalCalc(ts.getCluster, flinkLogicalTraits, flinkLogicalTs, program),
+      new FlinkLogicalCalc(
+        ts.getCluster, flinkLogicalTraits, flinkLogicalTs, ImmutableList.of(), program),
       ImmutableBitSet.of(0, 1),
       aggCallOfWindowAgg,
       tumblingGroupWindow,
@@ -1172,7 +1180,8 @@ class FlinkRelMdHandlerTestBase {
     val batchTs: BatchExecBoundedStreamScan =
       createDataStreamScan(ImmutableList.of("TemporalTable1"), batchPhysicalTraits)
     val batchCalc = new BatchExecCalc(
-      cluster, batchPhysicalTraits, batchTs, program, program.getOutputRowType)
+      cluster, batchPhysicalTraits, batchTs,
+      ImmutableList.of(), program, program.getOutputRowType)
     val hash01 = FlinkRelDistribution.hash(Array(0, 1), requireStrict = true)
     val batchExchange1 = new BatchExecExchange(
       cluster, batchPhysicalTraits.replace(hash01), batchCalc, hash01)
@@ -1249,7 +1258,7 @@ class FlinkRelMdHandlerTestBase {
     val streamTs: StreamExecDataStreamScan =
       createDataStreamScan(ImmutableList.of("TemporalTable1"), streamPhysicalTraits)
     val streamCalc = new BatchExecCalc(
-      cluster, streamPhysicalTraits, streamTs, program, program.getOutputRowType)
+      cluster, streamPhysicalTraits, streamTs, ImmutableList.of(), program, program.getOutputRowType)
     val streamExchange = new StreamExecExchange(
       cluster, streamPhysicalTraits.replace(hash01), streamCalc, hash01)
     val emitStrategy = WindowEmitStrategy(tableConfig, tumblingGroupWindow)
@@ -1308,7 +1317,8 @@ class FlinkRelMdHandlerTestBase {
     val flinkLogicalWindowAgg = new FlinkLogicalWindowAggregate(
       ts.getCluster,
       logicalTraits,
-      new FlinkLogicalCalc(ts.getCluster, flinkLogicalTraits, flinkLogicalTs, program),
+      new FlinkLogicalCalc(
+        ts.getCluster, flinkLogicalTraits, flinkLogicalTs, ImmutableList.of(), program),
       ImmutableBitSet.of(1),
       aggCallOfWindowAgg,
       tumblingGroupWindow,
@@ -1317,7 +1327,8 @@ class FlinkRelMdHandlerTestBase {
     val batchTs: BatchExecBoundedStreamScan =
       createDataStreamScan(ImmutableList.of("TemporalTable1"), batchPhysicalTraits)
     val batchCalc = new BatchExecCalc(
-      cluster, batchPhysicalTraits, batchTs, program, program.getOutputRowType)
+      cluster, batchPhysicalTraits, batchTs,
+      ImmutableList.of(), program, program.getOutputRowType)
     val hash1 = FlinkRelDistribution.hash(Array(1), requireStrict = true)
     val batchExchange1 = new BatchExecExchange(
       cluster, batchPhysicalTraits.replace(hash1), batchCalc, hash1)
@@ -1394,7 +1405,8 @@ class FlinkRelMdHandlerTestBase {
     val streamTs: StreamExecDataStreamScan =
       createDataStreamScan(ImmutableList.of("TemporalTable1"), streamPhysicalTraits)
     val streamCalc = new BatchExecCalc(
-      cluster, streamPhysicalTraits, streamTs, program, program.getOutputRowType)
+      cluster, streamPhysicalTraits, streamTs,
+      ImmutableList.of(), program, program.getOutputRowType)
     val streamExchange = new StreamExecExchange(
       cluster, streamPhysicalTraits.replace(hash1), streamCalc, hash1)
     val emitStrategy = WindowEmitStrategy(tableConfig, tumblingGroupWindow)
@@ -1455,7 +1467,8 @@ class FlinkRelMdHandlerTestBase {
     val flinkLogicalWindowAggWithAuxGroup = new FlinkLogicalWindowAggregate(
       ts.getCluster,
       logicalTraits,
-      new FlinkLogicalCalc(ts.getCluster, flinkLogicalTraits, flinkLogicalTs, program),
+      new FlinkLogicalCalc(
+        ts.getCluster, flinkLogicalTraits, flinkLogicalTs, ImmutableList.of(), program),
       ImmutableBitSet.of(0),
       aggCallOfWindowAgg,
       tumblingGroupWindow,
@@ -1464,7 +1477,8 @@ class FlinkRelMdHandlerTestBase {
     val batchTs: BatchExecBoundedStreamScan =
       createDataStreamScan(ImmutableList.of("TemporalTable2"), batchPhysicalTraits)
     val batchCalc = new BatchExecCalc(
-      cluster, batchPhysicalTraits, batchTs, program, program.getOutputRowType)
+      cluster, batchPhysicalTraits, batchTs,
+      ImmutableList.of(), program, program.getOutputRowType)
     val hash0 = FlinkRelDistribution.hash(Array(0), requireStrict = true)
     val batchExchange1 = new BatchExecExchange(
       cluster, batchPhysicalTraits.replace(hash0), batchCalc, hash0)
@@ -1595,7 +1609,8 @@ class FlinkRelMdHandlerTestBase {
     val flinkLogicalOverAgg = new FlinkLogicalOverAggregate(
       cluster,
       flinkLogicalTraits,
-      new FlinkLogicalCalc(cluster, flinkLogicalTraits, studentFlinkLogicalScan, rexProgram),
+      new FlinkLogicalCalc(
+        cluster, flinkLogicalTraits, studentFlinkLogicalScan, ImmutableList.of(), rexProgram),
       ImmutableList.of(),
       rowTypeOfWindowAgg,
       overAggGroups
@@ -1625,11 +1640,12 @@ class FlinkRelMdHandlerTestBase {
       cluster,
       flinkLogicalTraits,
       flinkLogicalOverAgg,
-      projectProgram
-    )
+      ImmutableList.of(),
+      projectProgram)
 
     val calc = new BatchExecCalc(
-      cluster, batchPhysicalTraits, studentBatchScan, rexProgram, rowTypeOfCalc)
+      cluster, batchPhysicalTraits, studentBatchScan,
+      ImmutableList.of(), rexProgram, rowTypeOfCalc)
     val hash4 = FlinkRelDistribution.hash(Array(4), requireStrict = true)
     val exchange1 = new BatchExecExchange(cluster, calc.getTraitSet.replace(hash4), calc, hash4)
     // sort class, name
@@ -1728,6 +1744,7 @@ class FlinkRelMdHandlerTestBase {
       cluster,
       batchPhysicalTraits,
       batchWindowAgg,
+      ImmutableList.of(),
       projectProgram,
       projectProgram.getOutputRowType
     )
@@ -1777,7 +1794,8 @@ class FlinkRelMdHandlerTestBase {
     val flinkLogicalOverAgg = new FlinkLogicalOverAggregate(
       cluster,
       flinkLogicalTraits,
-      new FlinkLogicalCalc(cluster, flinkLogicalTraits, studentFlinkLogicalScan, rexProgram),
+      new FlinkLogicalCalc(
+        cluster, flinkLogicalTraits, studentFlinkLogicalScan, ImmutableList.of(), rexProgram),
       ImmutableList.of(),
       rowTypeOfWindowAgg,
       util.Arrays.asList(overAggGroups.get(1))
@@ -1786,7 +1804,7 @@ class FlinkRelMdHandlerTestBase {
     val streamScan: StreamExecDataStreamScan =
       createDataStreamScan(ImmutableList.of("student"), streamPhysicalTraits)
     val calc = new StreamExecCalc(
-      cluster, streamPhysicalTraits, streamScan, rexProgram, rowTypeOfCalc)
+      cluster, streamPhysicalTraits, streamScan, ImmutableList.of(), rexProgram, rowTypeOfCalc)
     val hash4 = FlinkRelDistribution.hash(Array(4), requireStrict = true)
     val exchange = new StreamExecExchange(cluster, calc.getTraitSet.replace(hash4), calc, hash4)
 
@@ -1822,6 +1840,7 @@ class FlinkRelMdHandlerTestBase {
       cluster,
       streamPhysicalTraits,
       windowAgg,
+      ImmutableList.of(),
       projectProgram,
       projectProgram.getOutputRowType
     )
@@ -2420,7 +2439,7 @@ class FlinkRelMdHandlerTestBase {
       predicate,
       outputRowType,
       rexBuilder)
-    FlinkLogicalCalc.create(input, program)
+    FlinkLogicalCalc.create(input, program, ImmutableList.of())
   }
 
   protected def makeLiteral(

@@ -18,6 +18,7 @@
 
 package org.apache.flink.table.planner.plan.rules.logical
 
+import com.google.common.collect.ImmutableList
 import org.apache.calcite.plan.RelOptRule.{any, operand}
 import org.apache.calcite.plan.{RelOptRule, RelOptRuleCall, RelOptUtil}
 import org.apache.calcite.rel.core.JoinRelType
@@ -77,6 +78,7 @@ class SplitPythonConditionFromCorrelateRule
       mergedCalc.getCluster,
       mergedCalc.getTraitSet,
       input,
+      mergedCalc.getHints,
       RexProgram.create(
         input.getRowType,
         mergedCalcProgram.getProjectList,
@@ -107,6 +109,7 @@ class SplitPythonConditionFromCorrelateRule
       newCorrelate.getCluster,
       newCorrelate.getTraitSet,
       newCorrelate,
+      ImmutableList.of(),
       RexProgram.create(
         newCorrelate.getRowType,
         rexProgram.getExprList,

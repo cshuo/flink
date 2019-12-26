@@ -18,6 +18,7 @@
 
 package org.apache.flink.table.planner.plan.rules.logical
 
+import com.google.common.collect.ImmutableList
 import org.apache.calcite.plan.RelOptRule.{none, operand}
 import org.apache.calcite.plan.{RelOptRule, RelOptRuleCall, RelOptUtil}
 import org.apache.calcite.rel.core.JoinRelType
@@ -70,6 +71,7 @@ class SplitPythonConditionFromJoinRule extends RelOptRule(
       join.getCluster,
       join.getTraitSet,
       bottomJoin,
+      ImmutableList.of(),
       RexProgram.create(
         bottomJoin.getRowType,
         rexProgram.getExprList,

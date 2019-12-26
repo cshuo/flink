@@ -20,6 +20,7 @@ package org.apache.flink.table.planner.plan.nodes.physical.batch
 
 import java.util
 
+import com.google.common.collect.ImmutableList
 import org.apache.flink.table.dataformat.BaseRow
 import org.apache.flink.table.planner.plan.nodes.common.CommonCalc
 import org.apache.flink.table.planner.plan.nodes.exec.{BatchExecNode, ExecNode}
@@ -27,6 +28,7 @@ import org.apache.calcite.plan._
 import org.apache.calcite.rel._
 import org.apache.calcite.rel.`type`.RelDataType
 import org.apache.calcite.rel.core.Calc
+import org.apache.calcite.rel.hint.RelHint
 import org.apache.calcite.rex.{RexCall, RexInputRef, RexProgram}
 import org.apache.calcite.sql.SqlKind
 import org.apache.calcite.util.mapping.{Mapping, MappingType, Mappings}
@@ -43,9 +45,10 @@ abstract class BatchExecCalcBase(
     cluster: RelOptCluster,
     traitSet: RelTraitSet,
     inputRel: RelNode,
+    hints: ImmutableList[RelHint],
     calcProgram: RexProgram,
     outputRowType: RelDataType)
-  extends CommonCalc(cluster, traitSet, inputRel, calcProgram)
+  extends CommonCalc(cluster, traitSet, inputRel, hints, calcProgram)
   with BatchPhysicalRel
   with BatchExecNode[BaseRow] {
 

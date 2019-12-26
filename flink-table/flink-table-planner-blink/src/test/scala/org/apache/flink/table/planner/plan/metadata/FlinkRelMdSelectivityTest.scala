@@ -134,7 +134,8 @@ class FlinkRelMdSelectivityTest extends FlinkRelMdHandlerTestBase {
       outputRowType,
       rexBuilder)
 
-    val calc = new BatchExecCalc(cluster, batchPhysicalTraits, ts, program, outputRowType)
+    val calc = new BatchExecCalc(
+      cluster, batchPhysicalTraits, ts, ImmutableList.of(), program, outputRowType)
     // pop scan
     relBuilder.build()
     // push calc

@@ -69,6 +69,7 @@ class IncrementalAggregateRule
     val finalLocalAgg: StreamExecLocalGroupAggregate = call.rel(2)
     val partialGlobalAgg: StreamExecGlobalGroupAggregate = call.rel(3)
     val aggInputRowType = partialGlobalAgg.inputRowType
+    val hints = finalLocalAgg.getHints
 
     val partialLocalAggInfoList = partialGlobalAgg.localAggInfoList
     val partialGlobalAggInfoList = partialGlobalAgg.globalAggInfoList
@@ -112,6 +113,7 @@ class IncrementalAggregateRule
       partialGlobalAgg.getInput,
       aggInputRowType,
       incrAggOutputRowType,
+      hints,
       partialLocalAggInfoList,
       incrAggInfoList,
       aggCalls,
@@ -170,6 +172,7 @@ class IncrementalAggregateRule
         newExchange,
         finalGlobalAgg.inputRowType,
         finalGlobalAgg.getRowType,
+        hints,
         finalGlobalAgg.grouping,
         localAggInfoList, // the agg info list is changed
         globalAggInfoList, // the agg info list is changed

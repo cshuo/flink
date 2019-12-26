@@ -18,6 +18,9 @@
 
 package org.apache.flink.table.planner.plan.nodes.physical.stream
 
+import java.util
+
+import com.google.common.collect.ImmutableList
 import org.apache.flink.api.dag.Transformation
 import org.apache.flink.streaming.api.transformations.OneInputTransformation
 import org.apache.flink.table.dataformat.BaseRow
@@ -26,11 +29,11 @@ import org.apache.flink.table.planner.codegen.{CalcCodeGenerator, CodeGeneratorC
 import org.apache.flink.table.planner.delegation.StreamPlanner
 import org.apache.flink.table.runtime.operators.AbstractProcessStreamOperator
 import org.apache.flink.table.runtime.typeutils.BaseRowTypeInfo
-
 import org.apache.calcite.plan.{RelOptCluster, RelTraitSet}
 import org.apache.calcite.rel.RelNode
 import org.apache.calcite.rel.`type`.RelDataType
 import org.apache.calcite.rel.core.Calc
+import org.apache.calcite.rel.hint.RelHint
 import org.apache.calcite.rex.RexProgram
 
 /**
@@ -40,12 +43,23 @@ class StreamExecCalc(
     cluster: RelOptCluster,
     traitSet: RelTraitSet,
     inputRel: RelNode,
+    hints: ImmutableList[RelHint],
     calcProgram: RexProgram,
     outputRowType: RelDataType)
-  extends StreamExecCalcBase(cluster, traitSet, inputRel, calcProgram, outputRowType) {
+  extends StreamExecCalcBase(cluster, traitSet, inputRel, hints, calcProgram, outputRowType) {
 
   override def copy(traitSet: RelTraitSet, child: RelNode, program: RexProgram): Calc = {
-    new StreamExecCalc(cluster, traitSet, child, program, outputRowType)
+    new StreamExecCalc(cluster, traitSet, child, hints, program, outputRowType)
+  }
+
+  override def withHints(hints: util.List[RelHint]): RelNode = {
+    new StreamExecCalc(
+      cluster,
+      traitSet,
+      inputRel,
+      ImmutableList.copyOf(hints.iterator()),
+      calcProgram,
+      outputRowType)
   }
 
   override protected def translateToPlanInternal(

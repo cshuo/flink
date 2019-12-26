@@ -91,7 +91,7 @@ object FlinkLogicalRelFactories {
         case (childExpr, fieldName) => programBuilder.addProject(childExpr, fieldName)
       }
       val program = programBuilder.getProgram
-      FlinkLogicalCalc.create(input, program)
+      FlinkLogicalCalc.create(input, program, ImmutableList.of())
     }
   }
 
@@ -157,7 +157,7 @@ object FlinkLogicalRelFactories {
       programBuilder.addIdentity()
       programBuilder.addCondition(condition)
       val program = programBuilder.getProgram
-      FlinkLogicalCalc.create(input, program)
+      FlinkLogicalCalc.create(input, program, ImmutableList.of())
     }
   }
 

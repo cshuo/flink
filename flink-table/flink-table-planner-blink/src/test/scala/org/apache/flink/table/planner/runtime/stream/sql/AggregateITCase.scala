@@ -76,7 +76,8 @@ class AggregateITCase(
     tEnv.registerTable("T", t)
 
     val t1 = tEnv.sqlQuery(
-      "select sum(a), avg(a), min(a), count(a), count(1) from T where a > 9999 group by b")
+      "select /*+ Resource(MEM='1024MB'), agg_strategy(two_phase) */ " +
+        "sum(a), avg(a), min(a), count(a), count(1) from T where a > 9999 group by b")
     val sink = new TestingRetractSink
     t1.toRetractStream[Row].addSink(sink)
     env.execute()

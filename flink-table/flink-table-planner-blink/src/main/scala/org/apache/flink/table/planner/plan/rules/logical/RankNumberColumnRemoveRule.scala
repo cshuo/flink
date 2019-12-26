@@ -20,12 +20,12 @@ package org.apache.flink.table.planner.plan.rules.logical
 
 import org.apache.flink.table.planner.plan.nodes.logical.{FlinkLogicalCalc, FlinkLogicalRank}
 import org.apache.flink.table.runtime.operators.rank.{ConstantRankRange, RankType}
-
 import org.apache.calcite.plan.RelOptRule.{any, operand}
 import org.apache.calcite.plan.{RelOptRule, RelOptRuleCall}
 import org.apache.calcite.rex.RexProgramBuilder
-
 import java.math.{BigDecimal => JBigDecimal}
+
+import com.google.common.collect.ImmutableList
 
 /**
   * Planner rule that removes the output column of rank number
@@ -74,7 +74,7 @@ class RankNumberColumnRemoveRule
     }
 
     val rexProgram = programBuilder.getProgram
-    val calc = FlinkLogicalCalc.create(newRank, rexProgram)
+    val calc = FlinkLogicalCalc.create(newRank, rexProgram, ImmutableList.of())
     call.transformTo(calc)
   }
 }

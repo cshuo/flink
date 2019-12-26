@@ -44,6 +44,7 @@ abstract class PythonCalcSplitRuleBase(description: String)
   override def onMatch(call: RelOptRuleCall): Unit = {
     val calc: FlinkLogicalCalc = call.rel(0).asInstanceOf[FlinkLogicalCalc]
     val input = calc.getInput
+    val hints = calc.getHints
     val rexBuilder = call.builder().getRexBuilder
     val program = calc.getProgram
     val extractedRexCalls = new mutable.ArrayBuffer[RexCall]()
@@ -69,6 +70,7 @@ abstract class PythonCalcSplitRuleBase(description: String)
       calc.getCluster,
       calc.getTraitSet,
       input,
+      hints,
       RexProgram.create(
         input.getRowType,
         bottomCalcProjects.toList,
@@ -81,6 +83,7 @@ abstract class PythonCalcSplitRuleBase(description: String)
       calc.getCluster,
       calc.getTraitSet,
       bottomCalc,
+      hints,
       RexProgram.create(
         bottomCalc.getRowType,
         topCalcProjects.map(_.accept(inputRewriter)),

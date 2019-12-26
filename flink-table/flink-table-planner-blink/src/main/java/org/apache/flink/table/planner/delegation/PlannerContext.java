@@ -42,6 +42,7 @@ import org.apache.flink.table.planner.codegen.ExpressionReducer;
 import org.apache.flink.table.planner.functions.sql.FlinkSqlOperatorTable;
 import org.apache.flink.table.planner.plan.FlinkCalciteCatalogReader;
 import org.apache.flink.table.planner.plan.cost.FlinkCostFactory;
+import org.apache.flink.table.planner.plan.hints.BuiltInHintCatalog;
 import org.apache.flink.table.planner.plan.schema.ExpandingPreparingTable;
 import org.apache.flink.table.planner.utils.JavaScalaConversionUtil;
 import org.apache.flink.table.planner.utils.TableConfigUtils;
@@ -276,6 +277,7 @@ public class PlannerContext {
 						.withInSubQueryThreshold(Integer.MAX_VALUE)
 						.withExpand(false)
 						.withRelBuilderFactory(FlinkRelFactories.FLINK_REL_BUILDER())
+						.withHintStrategyTable(BuiltInHintCatalog.HINT_STRATEGY_TABLE)
 						.build()
 		);
 	}

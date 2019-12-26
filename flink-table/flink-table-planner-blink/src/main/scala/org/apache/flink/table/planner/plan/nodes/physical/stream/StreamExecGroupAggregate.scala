@@ -35,13 +35,14 @@ import org.apache.flink.table.runtime.operators.aggregate.{GroupAggFunction, Min
 import org.apache.flink.table.runtime.operators.bundle.KeyedMapBundleOperator
 import org.apache.flink.table.runtime.types.LogicalTypeDataTypeConverter.fromDataTypeToLogicalType
 import org.apache.flink.table.runtime.typeutils.BaseRowTypeInfo
-
 import org.apache.calcite.plan.{RelOptCluster, RelTraitSet}
 import org.apache.calcite.rel.`type`.RelDataType
 import org.apache.calcite.rel.core.AggregateCall
 import org.apache.calcite.rel.{RelNode, RelWriter}
-
 import java.util
+
+import com.google.common.collect.ImmutableList
+import org.apache.calcite.rel.hint.RelHint
 
 import scala.collection.JavaConversions._
 
@@ -57,10 +58,11 @@ class StreamExecGroupAggregate(
     traitSet: RelTraitSet,
     inputRel: RelNode,
     outputRowType: RelDataType,
+    hints: ImmutableList[RelHint],
     val grouping: Array[Int],
     val aggCalls: Seq[AggregateCall],
     var partialFinalType: PartialFinalType = PartialFinalType.NONE)
-  extends StreamExecGroupAggregateBase(cluster, traitSet, inputRel)
+  extends StreamExecGroupAggregateBase(cluster, traitSet, hints, inputRel)
   with StreamExecNode[BaseRow] {
 
   val aggInfoList: AggregateInfoList = {
@@ -95,9 +97,23 @@ class StreamExecGroupAggregate(
       traitSet,
       inputs.get(0),
       outputRowType,
+      hints,
       grouping,
       aggCalls,
       partialFinalType)
+  }
+
+  override def withHints(hintList: util.List[RelHint]): RelNode = {
+    new StreamExecGroupAggregate(
+      cluster,
+      traitSet,
+      inputRel,
+      outputRowType,
+      ImmutableList.copyOf(hintList.iterator()),
+      grouping,
+      aggCalls,
+      partialFinalType
+    )
   }
 
   override def explainTerms(pw: RelWriter): RelWriter = {

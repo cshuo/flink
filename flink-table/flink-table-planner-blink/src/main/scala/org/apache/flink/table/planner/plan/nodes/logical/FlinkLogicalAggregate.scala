@@ -21,7 +21,6 @@ package org.apache.flink.table.planner.plan.nodes.logical
 import org.apache.flink.table.planner.plan.PartialFinalType
 import org.apache.flink.table.planner.plan.nodes.FlinkConventions
 import org.apache.flink.table.planner.plan.utils.AggregateUtil
-
 import org.apache.calcite.plan._
 import org.apache.calcite.rel.RelNode
 import org.apache.calcite.rel.convert.ConverterRule
@@ -30,8 +29,10 @@ import org.apache.calcite.rel.logical.LogicalAggregate
 import org.apache.calcite.rel.metadata.RelMetadataQuery
 import org.apache.calcite.sql.SqlKind
 import org.apache.calcite.util.ImmutableBitSet
-
 import java.util
+
+import com.google.common.collect.ImmutableList
+import org.apache.calcite.rel.hint.RelHint
 
 import scala.collection.JavaConversions._
 
@@ -43,12 +44,13 @@ class FlinkLogicalAggregate(
     cluster: RelOptCluster,
     traitSet: RelTraitSet,
     child: RelNode,
+    hints: ImmutableList[RelHint],
     groupSet: ImmutableBitSet,
     groupSets: util.List[ImmutableBitSet],
     aggCalls: util.List[AggregateCall],
     /* flag indicating whether to skip SplitAggregateRule */
     var partialFinalType: PartialFinalType = PartialFinalType.NONE)
-  extends Aggregate(cluster, traitSet, child, groupSet, groupSets, aggCalls)
+  extends Aggregate(cluster, traitSet, hints, child, groupSet, groupSets, aggCalls)
   with FlinkLogicalRel {
 
   def setPartialFinalType(partialFinalType: PartialFinalType): Unit = {
@@ -62,7 +64,19 @@ class FlinkLogicalAggregate(
       groupSets: util.List[ImmutableBitSet],
       aggCalls: util.List[AggregateCall]): Aggregate = {
     new FlinkLogicalAggregate(
-      cluster, traitSet, input, groupSet, groupSets, aggCalls, partialFinalType)
+      cluster, traitSet, input, hints, groupSet, groupSets, aggCalls, partialFinalType)
+  }
+
+  override def withHints(hintList: util.List[RelHint]): RelNode = {
+    new FlinkLogicalAggregate(
+      cluster,
+      traitSet,
+      child,
+      ImmutableList.copyOf(hintList.iterator()),
+      groupSet,
+      getGroupSets,
+      aggCalls,
+      partialFinalType)
   }
 
   override def computeSelfCost(planner: RelOptPlanner, mq: RelMetadataQuery): RelOptCost = {
@@ -113,7 +127,7 @@ private class FlinkLogicalAggregateBatchConverter
       newInput,
       agg.getGroupSet,
       agg.getGroupSets,
-      agg.getAggCallList)
+      agg.getAggCallList).withHints(agg.getHints)
   }
 }
 
@@ -142,7 +156,7 @@ private class FlinkLogicalAggregateStreamConverter
       newInput,
       agg.getGroupSet,
       agg.getGroupSets,
-      agg.getAggCallList)
+      agg.getAggCallList).withHints(agg.getHints)
   }
 }
 
@@ -157,6 +171,7 @@ object FlinkLogicalAggregate {
       aggCalls: util.List[AggregateCall]): FlinkLogicalAggregate = {
     val cluster = input.getCluster
     val traitSet = cluster.traitSetOf(FlinkConventions.LOGICAL).simplify()
-    new FlinkLogicalAggregate(cluster,traitSet, input, groupSet, groupSets, aggCalls)
+    new FlinkLogicalAggregate(
+      cluster, traitSet, input, ImmutableList.of(), groupSet, groupSets, aggCalls)
   }
 }

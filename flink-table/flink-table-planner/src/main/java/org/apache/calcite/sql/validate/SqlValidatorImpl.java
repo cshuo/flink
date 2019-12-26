@@ -1076,13 +1076,19 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
 			// Handle extended identifiers.
 			final SqlCall call = (SqlCall) node;
 			switch (call.getOperator().getKind()) {
+				case TABLE_REF:
+					return getNamespace(call.operand(0), scope);
 				case EXTEND:
-					final SqlIdentifier id = (SqlIdentifier) call.getOperandList().get(0);
+					final SqlNode operand0 = call.getOperandList().get(0);
+					final SqlIdentifier identifier = operand0.getKind() == SqlKind.TABLE_REF
+						? ((SqlCall) operand0).operand(0)
+						: (SqlIdentifier) operand0;
 					final DelegatingScope idScope = (DelegatingScope) scope;
-					return getNamespace(id, idScope);
+					return getNamespace(identifier, idScope);
 				case AS:
 					final SqlNode nested = call.getOperandList().get(0);
 					switch (nested.getKind()) {
+						case TABLE_REF:
 						case EXTEND:
 							return getNamespace(nested, scope);
 					}
@@ -1115,6 +1121,7 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
 					return ns;
 				}
 				// fall through
+			case TABLE_REF:
 			case SNAPSHOT:
 			case OVER:
 			case COLLECTION_TABLE:
@@ -1230,7 +1237,7 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
 						new SqlNodeList(SqlParserPos.ZERO);
 					selectList.add(SqlIdentifier.star(SqlParserPos.ZERO));
 					return new SqlSelect(node.getParserPosition(), null, selectList, node,
-						null, null, null, null, null, null, null);
+						null, null, null, null, null, null, null, null);
 				}
 
 			case ORDER_BY: {
@@ -1287,7 +1294,7 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
 				}
 				return new SqlSelect(SqlParserPos.ZERO, null, selectList, orderBy.query,
 					null, null, null, null, orderList, orderBy.offset,
-					orderBy.fetch);
+					orderBy.fetch, null);
 			}
 
 			case EXPLICIT_TABLE: {
@@ -1296,7 +1303,7 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
 				final SqlNodeList selectList = new SqlNodeList(SqlParserPos.ZERO);
 				selectList.add(SqlIdentifier.star(SqlParserPos.ZERO));
 				return new SqlSelect(SqlParserPos.ZERO, null, selectList, call.operand(0),
-					null, null, null, null, null, null, null);
+					null, null, null, null, null, null, null, null);
 			}
 
 			case DELETE: {
@@ -1390,7 +1397,7 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
 				call.getCondition());
 		SqlSelect select =
 			new SqlSelect(SqlParserPos.ZERO, null, selectList, outerJoin, null,
-				null, null, null, null, null, null);
+				null, null, null, null, null, null, null);
 		call.setSourceSelect(select);
 
 		// Source for the insert call is a select of the source table
@@ -1408,7 +1415,7 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
 			final SqlNode insertSource = SqlNode.clone(sourceTableRef);
 			select =
 				new SqlSelect(SqlParserPos.ZERO, null, selectList, insertSource, null,
-					null, null, null, null, null, null);
+					null, null, null, null, null, null, null);
 			insertCall.setSource(select);
 		}
 	}
@@ -1473,7 +1480,7 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
 		}
 		source =
 			new SqlSelect(SqlParserPos.ZERO, null, selectList, source, null, null,
-				null, null, null, null, null);
+				null, null, null, null, null, null);
 		source = SqlValidatorUtil.addAlias(source, UPDATE_SRC_ALIAS);
 		SqlMerge mergeCall =
 			new SqlMerge(updateCall.getParserPosition(), target, condition, source,
@@ -1528,7 +1535,7 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
 					call.getAlias().getSimple());
 		}
 		return new SqlSelect(SqlParserPos.ZERO, null, selectList, sourceTable,
-			call.getCondition(), null, null, null, null, null, null);
+			call.getCondition(), null, null, null, null, null, null, null);
 	}
 
 	/**
@@ -1549,7 +1556,7 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
 					call.getAlias().getSimple());
 		}
 		return new SqlSelect(SqlParserPos.ZERO, null, selectList, sourceTable,
-			call.getCondition(), null, null, null, null, null, null);
+			call.getCondition(), null, null, null, null, null, null, null);
 	}
 
 	/**
@@ -2310,6 +2317,22 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
 						child.namespace, forceNullable);
 				}
 
+				return newNode;
+
+			case TABLE_REF:
+				call = (SqlCall) node;
+				registerFrom(parentScope,
+					usingScope,
+					register,
+					call.operand(0),
+					enclosingNode,
+					alias,
+					extendList,
+					forceNullable,
+					lateral);
+				if (extendList != null && extendList.size() != 0) {
+					return enclosingNode;
+				}
 				return newNode;
 
 			case EXTEND:
@@ -3101,6 +3124,7 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
 		Objects.requireNonNull(targetRowType);
 		switch (node.getKind()) {
 			case AS:
+			case TABLE_REF:
 				validateFrom(
 					((SqlCall) node).operand(0),
 					targetRowType,

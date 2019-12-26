@@ -231,7 +231,7 @@ class RelTimeIndicatorConverter(rexBuilder: RexBuilder) extends RelShuttle {
 
     val projects = project.getProjects.map(_.accept(materializer))
     val fieldNames = project.getRowType.getFieldNames
-    LogicalProject.create(input, projects, fieldNames)
+    LogicalProject.create(input, projects, fieldNames).withHints(project.getHints)
   }
 
   override def visit(join: LogicalJoin): RelNode = {
@@ -408,7 +408,7 @@ class RelTimeIndicatorConverter(rexBuilder: RexBuilder) extends RelShuttle {
           LogicalProject.create(
             lp.getInput,
             projects,
-            input.getRowType.getFieldNames)
+            input.getRowType.getFieldNames).withHints(lp.getHints)
 
         // new project
         case _ =>
@@ -462,6 +462,7 @@ class RelTimeIndicatorConverter(rexBuilder: RexBuilder) extends RelShuttle {
       aggregate.getGroupSet,
       aggregate.getGroupSets,
       updatedAggCalls)
+      .withHints(aggregate.getHints).asInstanceOf[LogicalAggregate]
   }
 
 }

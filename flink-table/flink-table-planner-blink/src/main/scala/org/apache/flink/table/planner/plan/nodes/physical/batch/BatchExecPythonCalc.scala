@@ -18,10 +18,14 @@
 
 package org.apache.flink.table.planner.plan.nodes.physical.batch
 
+import java.util
+
+import com.google.common.collect.ImmutableList
 import org.apache.calcite.plan.{RelOptCluster, RelTraitSet}
 import org.apache.calcite.rel.RelNode
 import org.apache.calcite.rel.`type`.RelDataType
 import org.apache.calcite.rel.core.Calc
+import org.apache.calcite.rel.hint.RelHint
 import org.apache.calcite.rex.RexProgram
 import org.apache.flink.api.dag.Transformation
 import org.apache.flink.configuration.{ConfigOption, Configuration, MemorySize}
@@ -37,18 +41,30 @@ class BatchExecPythonCalc(
     cluster: RelOptCluster,
     traitSet: RelTraitSet,
     inputRel: RelNode,
+    hints: ImmutableList[RelHint],
     calcProgram: RexProgram,
     outputRowType: RelDataType)
   extends BatchExecCalcBase(
     cluster,
     traitSet,
     inputRel,
+    hints,
     calcProgram,
     outputRowType)
   with CommonPythonCalc {
 
   override def copy(traitSet: RelTraitSet, child: RelNode, program: RexProgram): Calc = {
-    new BatchExecPythonCalc(cluster, traitSet, child, program, outputRowType)
+    new BatchExecPythonCalc(cluster, traitSet, child, hints, program, outputRowType)
+  }
+
+  override def withHints(hints: util.List[RelHint]): RelNode = {
+    new BatchExecPythonCalc(
+      cluster,
+      traitSet,
+      inputRel,
+      ImmutableList.copyOf(hints.iterator()),
+      calcProgram,
+      outputRowType)
   }
 
   override protected def translateToPlanInternal(planner: BatchPlanner): Transformation[BaseRow] = {
