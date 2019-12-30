@@ -26,16 +26,16 @@ import org.apache.flink.table.planner.plan.`trait`.FlinkRelDistribution
 import org.apache.flink.table.planner.plan.nodes.FlinkConventions
 import org.apache.flink.table.planner.plan.nodes.logical.FlinkLogicalJoin
 import org.apache.flink.table.planner.plan.nodes.physical.batch.BatchExecSortMergeJoin
-import org.apache.flink.table.planner.plan.utils.{FlinkRelOptUtil, OperatorType}
+import org.apache.flink.table.planner.plan.utils.{FlinkRelOptUtil, HintUtils, OperatorType}
 import org.apache.flink.table.planner.utils.TableConfigUtils.isOperatorDisabled
-
 import org.apache.calcite.plan.RelOptRule.{any, operand}
 import org.apache.calcite.plan.{RelOptRule, RelOptRuleCall, RelTraitSet}
 import org.apache.calcite.rel.core.Join
 import org.apache.calcite.rel.{RelCollations, RelNode}
 import org.apache.calcite.util.ImmutableIntList
-
 import java.lang.{Boolean => JBoolean}
+
+import org.apache.flink.table.planner.plan.hints.Hints.JoinHintType
 
 import scala.collection.JavaConversions._
 
@@ -54,6 +54,16 @@ class BatchExecSortMergeJoinRule
     val join: Join = call.rel(0)
     val joinInfo = join.analyzeCondition
     val tableConfig = call.getPlanner.getContext.unwrap(classOf[FlinkContext]).getTableConfig
+
+    val hintJoinType = HintUtils.getApplicableJoinHintType(join, tableConfig)
+    if (hintJoinType.isPresent) {
+      if (hintJoinType.get() == JoinHintType.NMJ) {
+        return false
+      } else if (!HintUtils.isNegativeJoinHint(hintJoinType.get())) {
+        return hintJoinType.get() == JoinHintType.SMJ
+      }
+    }
+
     val isSortMergeJoinEnabled = !isOperatorDisabled(tableConfig, OperatorType.SortMergeJoin)
     !joinInfo.pairs().isEmpty && isSortMergeJoinEnabled
   }

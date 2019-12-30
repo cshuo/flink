@@ -1,0 +1,218 @@
+<?xml version="1.0" ?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one or more
+contributor license agreements.  See the NOTICE file distributed with
+this work for additional information regarding copyright ownership.
+The ASF licenses this file to you under the Apache License, Version 2.0
+(the "License"); you may not use this file except in compliance with
+the License.  You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<Root>
+  <TestCase name="testHintedBroadcastJoin">
+    <Resource name="sql">
+      <![CDATA[SELECT /*+ USE_BROADCAST(MyTable1) */ c, g
+FROM MyTable2, MyTable1 WHERE a = d AND d < 2]]>
+    </Resource>
+    <Resource name="planBefore">
+      <![CDATA[
+LogicalProject(c=[$7], g=[$3])
++- LogicalFilter(condition=[AND(=($5, $0), <($0, 2))])
+   +- LogicalJoin(condition=[true], joinType=[inner])
+      :- LogicalTableScan(table=[[default_catalog, default_database, MyTable2, source: [TestTableSource(d, e, f, g, h)]]])
+      +- LogicalTableScan(table=[[default_catalog, default_database, MyTable1, source: [TestTableSource(a, b, c)]]])
+]]>
+    </Resource>
+    <Resource name="planAfter">
+      <![CDATA[
+Calc(select=[c, g])
++- HashJoin(joinType=[InnerJoin], where=[=(a, d)], select=[d, g, a, c], isBroadcast=[true], build=[right])
+   :- Calc(select=[d, g], where=[<(d, 2)])
+   :  +- TableSourceScan(table=[[default_catalog, default_database, MyTable2, source: [TestTableSource(d, e, f, g, h)]]], fields=[d, e, f, g, h])
+   +- Exchange(distribution=[broadcast])
+      +- Calc(select=[a, c])
+         +- TableSourceScan(table=[[default_catalog, default_database, MyTable1, source: [TestTableSource(a, b, c)]]], fields=[a, b, c])
+]]>
+    </Resource>
+  </TestCase>
+  <TestCase name="testHintedShuffleHashJoin">
+    <Resource name="sql">
+      <![CDATA[SELECT /*+ USE_HASH(MyTable1) */ c, g
+FROM MyTable2, MyTable1 WHERE a = d AND d < 2]]>
+    </Resource>
+    <Resource name="planBefore">
+      <![CDATA[
+LogicalProject(c=[$7], g=[$3])
++- LogicalFilter(condition=[AND(=($5, $0), <($0, 2))])
+   +- LogicalJoin(condition=[true], joinType=[inner])
+      :- LogicalTableScan(table=[[default_catalog, default_database, MyTable2, source: [TestTableSource(d, e, f, g, h)]]])
+      +- LogicalTableScan(table=[[default_catalog, default_database, MyTable1, source: [TestTableSource(a, b, c)]]])
+]]>
+    </Resource>
+    <Resource name="planAfter">
+      <![CDATA[
+Calc(select=[c, g])
++- HashJoin(joinType=[InnerJoin], where=[=(a, d)], select=[d, g, a, c], build=[right])
+   :- Exchange(distribution=[hash[d]])
+   :  +- Calc(select=[d, g], where=[<(d, 2)])
+   :     +- TableSourceScan(table=[[default_catalog, default_database, MyTable2, source: [TestTableSource(d, e, f, g, h)]]], fields=[d, e, f, g, h])
+   +- Exchange(distribution=[hash[a]])
+      +- Calc(select=[a, c])
+         +- TableSourceScan(table=[[default_catalog, default_database, MyTable1, source: [TestTableSource(a, b, c)]]], fields=[a, b, c])
+]]>
+    </Resource>
+  </TestCase>
+  <TestCase name="testHintedSortMergeJoin">
+    <Resource name="sql">
+      <![CDATA[SELECT /*+ USE_MERGE(MyTable1, MyTable2) */ c, g
+FROM MyTable2, MyTable1 WHERE a = d AND d < 2]]>
+    </Resource>
+    <Resource name="planBefore">
+      <![CDATA[
+LogicalProject(c=[$7], g=[$3])
++- LogicalFilter(condition=[AND(=($5, $0), <($0, 2))])
+   +- LogicalJoin(condition=[true], joinType=[inner])
+      :- LogicalTableScan(table=[[default_catalog, default_database, MyTable2, source: [TestTableSource(d, e, f, g, h)]]])
+      +- LogicalTableScan(table=[[default_catalog, default_database, MyTable1, source: [TestTableSource(a, b, c)]]])
+]]>
+    </Resource>
+    <Resource name="planAfter">
+      <![CDATA[
+Calc(select=[c, g])
++- SortMergeJoin(joinType=[InnerJoin], where=[=(a, d)], select=[d, g, a, c])
+   :- Exchange(distribution=[hash[d]])
+   :  +- Calc(select=[d, g], where=[<(d, 2)])
+   :     +- TableSourceScan(table=[[default_catalog, default_database, MyTable2, source: [TestTableSource(d, e, f, g, h)]]], fields=[d, e, f, g, h])
+   +- Exchange(distribution=[hash[a]])
+      +- Calc(select=[a, c])
+         +- TableSourceScan(table=[[default_catalog, default_database, MyTable1, source: [TestTableSource(a, b, c)]]], fields=[a, b, c])
+]]>
+    </Resource>
+  </TestCase>
+  <TestCase name="testHintedNestedLoopJoin">
+    <Resource name="sql">
+      <![CDATA[SELECT /*+ USE_NL(MyTable1) */ c, g
+FROM MyTable2, MyTable1 WHERE a = d AND d < 2]]>
+    </Resource>
+    <Resource name="planBefore">
+      <![CDATA[
+LogicalProject(c=[$7], g=[$3])
++- LogicalFilter(condition=[AND(=($5, $0), <($0, 2))])
+   +- LogicalJoin(condition=[true], joinType=[inner])
+      :- LogicalTableScan(table=[[default_catalog, default_database, MyTable2, source: [TestTableSource(d, e, f, g, h)]]])
+      +- LogicalTableScan(table=[[default_catalog, default_database, MyTable1, source: [TestTableSource(a, b, c)]]])
+]]>
+    </Resource>
+    <Resource name="planAfter">
+      <![CDATA[
+Calc(select=[c, g])
++- NestedLoopJoin(joinType=[InnerJoin], where=[=(a, d)], select=[d, g, a, c], build=[right])
+   :- Calc(select=[d, g], where=[<(d, 2)])
+   :  +- TableSourceScan(table=[[default_catalog, default_database, MyTable2, source: [TestTableSource(d, e, f, g, h)]]], fields=[d, e, f, g, h])
+   +- Exchange(distribution=[broadcast])
+      +- Calc(select=[a, c])
+         +- TableSourceScan(table=[[default_catalog, default_database, MyTable1, source: [TestTableSource(a, b, c)]]], fields=[a, b, c])
+]]>
+    </Resource>
+  </TestCase>
+  <TestCase name="testMultiHintsConflict">
+    <Resource name="sql">
+      <![CDATA[SELECT /*+ USE_NL(MyTable1), USE_MERGE(MyTable2), USE_BROADCAST(MyTable1) */
+c, g FROM MyTable2, MyTable1 WHERE a = d AND d < 2]]>
+    </Resource>
+    <Resource name="planBefore">
+      <![CDATA[
+LogicalProject(c=[$7], g=[$3])
++- LogicalFilter(condition=[AND(=($5, $0), <($0, 2))])
+   +- LogicalJoin(condition=[true], joinType=[inner])
+      :- LogicalTableScan(table=[[default_catalog, default_database, MyTable2, source: [TestTableSource(d, e, f, g, h)]]])
+      +- LogicalTableScan(table=[[default_catalog, default_database, MyTable1, source: [TestTableSource(a, b, c)]]])
+]]>
+    </Resource>
+    <Resource name="planAfter">
+      <![CDATA[
+Calc(select=[c, g])
++- HashJoin(joinType=[InnerJoin], where=[=(a, d)], select=[d, g, a, c], isBroadcast=[true], build=[right])
+   :- Calc(select=[d, g], where=[<(d, 2)])
+   :  +- TableSourceScan(table=[[default_catalog, default_database, MyTable2, source: [TestTableSource(d, e, f, g, h)]]], fields=[d, e, f, g, h])
+   +- Exchange(distribution=[broadcast])
+      +- Calc(select=[a, c])
+         +- TableSourceScan(table=[[default_catalog, default_database, MyTable1, source: [TestTableSource(a, b, c)]]], fields=[a, b, c])
+]]>
+    </Resource>
+  </TestCase>
+  <TestCase name="testHintedMultiJoins">
+    <Resource name="sql">
+      <![CDATA[SELECT /*+  use_broadcast(MyTable1), use_nl(MyTable3) */
+c, g, z FROM MyTable2, MyTable1, MyTable3 WHERE a = x AND a = d AND d < 2]]>
+    </Resource>
+    <Resource name="planBefore">
+      <![CDATA[
+LogicalProject(c=[$7], g=[$3], z=[$10])
++- LogicalFilter(condition=[AND(=($5, $8), =($5, $0), <($0, 2))])
+   +- LogicalJoin(condition=[true], joinType=[inner])
+      :- LogicalJoin(condition=[true], joinType=[inner])
+      :  :- LogicalTableScan(table=[[default_catalog, default_database, MyTable2, source: [TestTableSource(d, e, f, g, h)]]])
+      :  +- LogicalTableScan(table=[[default_catalog, default_database, MyTable1, source: [TestTableSource(a, b, c)]]])
+      +- LogicalTableScan(table=[[default_catalog, default_database, MyTable3, source: [TestTableSource(x, y, z)]]])
+]]>
+    </Resource>
+    <Resource name="planAfter">
+      <![CDATA[
+Calc(select=[c, g, z])
++- NestedLoopJoin(joinType=[InnerJoin], where=[=(a, x)], select=[g, a, c, x, z], build=[right])
+   :- Calc(select=[g, a, c])
+   :  +- HashJoin(joinType=[InnerJoin], where=[=(a, d)], select=[d, g, a, c], isBroadcast=[true], build=[right])
+   :     :- Calc(select=[d, g], where=[<(d, 2)])
+   :     :  +- TableSourceScan(table=[[default_catalog, default_database, MyTable2, source: [TestTableSource(d, e, f, g, h)]]], fields=[d, e, f, g, h])
+   :     +- Exchange(distribution=[broadcast])
+   :        +- Calc(select=[a, c])
+   :           +- TableSourceScan(table=[[default_catalog, default_database, MyTable1, source: [TestTableSource(a, b, c)]]], fields=[a, b, c])
+   +- Exchange(distribution=[broadcast])
+      +- Calc(select=[x, z])
+         +- TableSourceScan(table=[[default_catalog, default_database, MyTable3, source: [TestTableSource(x, y, z)]]], fields=[x, y, z])
+]]>
+    </Resource>
+  </TestCase>
+  <TestCase name="testNegativeJoinHints">
+    <Resource name="sql">
+      <![CDATA[SELECT /*+  use_broadcast(MyTable1), no_use_hash */
+c, g, z FROM MyTable2, MyTable1, MyTable3 WHERE a = x AND a = d AND d < 2]]>
+    </Resource>
+    <Resource name="planBefore">
+      <![CDATA[
+LogicalProject(c=[$7], g=[$3], z=[$10])
++- LogicalFilter(condition=[AND(=($5, $8), =($5, $0), <($0, 2))])
+   +- LogicalJoin(condition=[true], joinType=[inner])
+      :- LogicalJoin(condition=[true], joinType=[inner])
+      :  :- LogicalTableScan(table=[[default_catalog, default_database, MyTable2, source: [TestTableSource(d, e, f, g, h)]]])
+      :  +- LogicalTableScan(table=[[default_catalog, default_database, MyTable1, source: [TestTableSource(a, b, c)]]])
+      +- LogicalTableScan(table=[[default_catalog, default_database, MyTable3, source: [TestTableSource(x, y, z)]]])
+]]>
+    </Resource>
+    <Resource name="planAfter">
+      <![CDATA[
+Calc(select=[c, g, z])
++- SortMergeJoin(joinType=[InnerJoin], where=[=(a, x)], select=[g, a, c, x, z])
+   :- Exchange(distribution=[hash[a]])
+   :  +- Calc(select=[g, a, c])
+   :     +- HashJoin(joinType=[InnerJoin], where=[=(a, d)], select=[d, g, a, c], isBroadcast=[true], build=[right])
+   :        :- Calc(select=[d, g], where=[<(d, 2)])
+   :        :  +- TableSourceScan(table=[[default_catalog, default_database, MyTable2, source: [TestTableSource(d, e, f, g, h)]]], fields=[d, e, f, g, h])
+   :        +- Exchange(distribution=[broadcast])
+   :           +- Calc(select=[a, c])
+   :              +- TableSourceScan(table=[[default_catalog, default_database, MyTable1, source: [TestTableSource(a, b, c)]]], fields=[a, b, c])
+   +- Exchange(distribution=[hash[x]])
+      +- Calc(select=[x, z])
+         +- TableSourceScan(table=[[default_catalog, default_database, MyTable3, source: [TestTableSource(x, y, z)]]], fields=[x, y, z])
+]]>
+    </Resource>
+  </TestCase>
+</Root>

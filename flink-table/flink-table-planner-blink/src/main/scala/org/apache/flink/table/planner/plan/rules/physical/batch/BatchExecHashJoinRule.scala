@@ -26,16 +26,16 @@ import org.apache.flink.table.planner.plan.`trait`.FlinkRelDistribution
 import org.apache.flink.table.planner.plan.nodes.FlinkConventions
 import org.apache.flink.table.planner.plan.nodes.logical.FlinkLogicalJoin
 import org.apache.flink.table.planner.plan.nodes.physical.batch.BatchExecHashJoin
-import org.apache.flink.table.planner.plan.utils.OperatorType
+import org.apache.flink.table.planner.plan.utils.{HintUtils, JoinUtil, OperatorType}
 import org.apache.flink.table.planner.utils.TableConfigUtils.isOperatorDisabled
-
 import org.apache.calcite.plan.RelOptRule.{any, operand}
 import org.apache.calcite.plan.{RelOptRule, RelOptRuleCall, RelTraitSet}
 import org.apache.calcite.rel.RelNode
 import org.apache.calcite.rel.core.{Join, JoinRelType}
 import org.apache.calcite.util.ImmutableIntList
-
 import java.util
+
+import org.apache.flink.table.planner.plan.hints.Hints.JoinHintType
 
 import scala.collection.JavaConversions._
 
@@ -52,14 +52,26 @@ class BatchExecHashJoinRule
   with BatchExecJoinRuleBase {
 
   override def matches(call: RelOptRuleCall): Boolean = {
+    val tableConfig = call.getPlanner.getContext.unwrap(classOf[FlinkContext]).getTableConfig
     val join: Join = call.rel(0)
+
+    val hintJoinType = HintUtils.getApplicableJoinHintType(join, tableConfig)
+    // There exists applicable join hint.
+    if (hintJoinType.isPresent) {
+      if (hintJoinType.get() == JoinHintType.NHJ) {
+        return false
+      } else if (!HintUtils.isNegativeJoinHint(hintJoinType.get())) {
+        return hintJoinType.get() == JoinHintType.BHJ ||
+          hintJoinType.get() ==JoinHintType.SHJ
+      }
+    }
+
     val joinInfo = join.analyzeCondition
     // join keys must not be empty
     if (joinInfo.pairs().isEmpty) {
       return false
     }
 
-    val tableConfig = call.getPlanner.getContext.unwrap(classOf[FlinkContext]).getTableConfig
     val isShuffleHashJoinEnabled = !isOperatorDisabled(tableConfig, OperatorType.ShuffleHashJoin)
     val isBroadcastHashJoinEnabled = !isOperatorDisabled(
       tableConfig, OperatorType.BroadcastHashJoin)
@@ -92,20 +104,7 @@ class BatchExecHashJoinRule
       case _ => (join.getRight, false)
     }
 
-    val leftSize = binaryRowRelNodeSize(left)
-    val rightSize = binaryRowRelNodeSize(right)
-
-    val (isBroadcast, leftIsBroadcast) = canBroadcast(joinType, leftSize, rightSize, tableConfig)
-
-    val leftIsBuild = if (isBroadcast) {
-      leftIsBroadcast
-    } else if (leftSize == null || rightSize == null || leftSize == rightSize) {
-      // use left to build hash table if leftSize or rightSize is unknown or equal size.
-      // choose right to build if join is SEMI/ANTI.
-      !join.getJoinType.projectsRight
-    } else {
-      leftSize < rightSize
-    }
+    val (leftIsBuild, isBroadcast) = getBuildSideAndBroadcast(join, left, right, tableConfig)
 
     def transformToEquiv(leftRequiredTrait: RelTraitSet, rightRequiredTrait: RelTraitSet): Unit = {
       val newLeft = RelOptRule.convert(left, leftRequiredTrait)
@@ -130,7 +129,7 @@ class BatchExecHashJoinRule
       val probeTrait = join.getTraitSet.replace(FlinkConventions.BATCH_PHYSICAL)
       val buildTrait = join.getTraitSet.replace(FlinkConventions.BATCH_PHYSICAL)
         .replace(FlinkRelDistribution.BROADCAST_DISTRIBUTED)
-      if (leftIsBroadcast) {
+      if (leftIsBuild) {
         transformToEquiv(buildTrait, probeTrait)
       } else {
         transformToEquiv(probeTrait, buildTrait)
@@ -155,7 +154,44 @@ class BatchExecHashJoinRule
         }
       }
     }
+  }
 
+  private def getBuildSideAndBroadcast(
+      join: Join,
+      left: RelNode,
+      right: RelNode,
+      tableConfig: TableConfig): (Boolean, Boolean) = {
+
+    // check the join hint.
+    val hintJoinType = HintUtils.getApplicableJoinHintType(join, tableConfig)
+    if (hintJoinType.isPresent) {
+      val (left, right) = JoinUtil.getJoinTableNames(join)
+      val hintTableNames = HintUtils.getJoinHintContent(
+        left, right, join.getHints, hintJoinType.get())
+      if (hintTableNames.size() == 1) {
+        if (hintJoinType.get() == JoinHintType.BHJ) {
+          return (left.isDefined && left.get.equals(hintTableNames.get(0)), true)
+        } else if (hintJoinType.get() == JoinHintType.SHJ) {
+          return (left.isDefined && left.get.equals(hintTableNames.get(0)), false)
+        }
+      }
+    }
+
+    val leftSize = binaryRowRelNodeSize(left)
+    val rightSize = binaryRowRelNodeSize(right)
+    val (isBroadcast, leftIsBroadcast) = canBroadcast(
+      join.getJoinType, leftSize, rightSize, tableConfig)
+
+    val leftIsBuild = if (isBroadcast) {
+      leftIsBroadcast
+    } else if (leftSize == null || rightSize == null || leftSize == rightSize) {
+      // use left to build hash table if leftSize or rightSize is unknown or equal size.
+      // choose right to build if join is SEMI/ANTI.
+      !join.getJoinType.projectsRight
+    } else {
+      leftSize < rightSize
+    }
+    (leftIsBuild, isBroadcast)
   }
 
   /**

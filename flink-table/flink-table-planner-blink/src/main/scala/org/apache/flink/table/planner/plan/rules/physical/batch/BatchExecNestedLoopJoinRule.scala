@@ -20,13 +20,14 @@ package org.apache.flink.table.planner.plan.rules.physical.batch
 import org.apache.flink.table.planner.calcite.FlinkContext
 import org.apache.flink.table.planner.plan.nodes.logical.FlinkLogicalJoin
 import org.apache.flink.table.planner.plan.nodes.physical.batch.BatchExecNestedLoopJoin
-import org.apache.flink.table.planner.plan.utils.OperatorType
+import org.apache.flink.table.planner.plan.utils.{HintUtils, JoinUtil, OperatorType}
 import org.apache.flink.table.planner.utils.TableConfigUtils.isOperatorDisabled
-
 import org.apache.calcite.plan.RelOptRule.{any, operand}
 import org.apache.calcite.plan.{RelOptRule, RelOptRuleCall}
 import org.apache.calcite.rel.RelNode
 import org.apache.calcite.rel.core.{Join, JoinRelType}
+import org.apache.flink.table.api.TableConfig
+import org.apache.flink.table.planner.plan.hints.Hints.JoinHintType
 
 /**
   * Rule that converts [[FlinkLogicalJoin]] to [[BatchExecNestedLoopJoin]]
@@ -42,6 +43,17 @@ class BatchExecNestedLoopJoinRule
 
   override def matches(call: RelOptRuleCall): Boolean = {
     val tableConfig = call.getPlanner.getContext.unwrap(classOf[FlinkContext]).getTableConfig
+    val join: Join = call.rel(0)
+
+    val hintJoinType = HintUtils.getApplicableJoinHintType(join, tableConfig)
+    if (hintJoinType.isPresent) {
+      if (hintJoinType.get() == JoinHintType.NNLJ) {
+        return false
+      } else if (!HintUtils.isNegativeJoinHint(hintJoinType.get())) {
+        return hintJoinType.get() == JoinHintType.NLJ
+      }
+    }
+
     !isOperatorDisabled(tableConfig, OperatorType.NestedLoopJoin)
   }
 
@@ -60,12 +72,26 @@ class BatchExecNestedLoopJoinRule
         }
       case _ => join.getRight
     }
-    val leftIsBuild = isLeftBuild(join, left, right)
+    val tableConfig = call.getPlanner.getContext.unwrap(classOf[FlinkContext]).getTableConfig
+    val leftIsBuild = isLeftBuild(join, left, right, tableConfig)
     val newJoin = createNestedLoopJoin(join, left, right, leftIsBuild, singleRowJoin = false)
     call.transformTo(newJoin)
   }
 
-  private def isLeftBuild(join: Join, left: RelNode, right: RelNode): Boolean = {
+  private def isLeftBuild(
+      join: Join, left: RelNode, right: RelNode, tableConfig: TableConfig): Boolean = {
+    // check the join hint.
+    val hintJoinType = HintUtils.getApplicableJoinHintType(join, tableConfig)
+    if (hintJoinType.isPresent && hintJoinType.get() == JoinHintType.NLJ) {
+      val (left, right) = JoinUtil.getJoinTableNames(join)
+      // check table names in the join hint, ignore it if there are more than 1 table names.
+      val hintTableNames = HintUtils.getJoinHintContent(
+        left, right, join.getHints, JoinHintType.NLJ)
+      if (hintTableNames.size() == 1) {
+        return left.isDefined && hintTableNames.get(0).equals(left.get)
+      }
+    }
+
     join.getJoinType match {
       case JoinRelType.LEFT => false
       case JoinRelType.RIGHT => true

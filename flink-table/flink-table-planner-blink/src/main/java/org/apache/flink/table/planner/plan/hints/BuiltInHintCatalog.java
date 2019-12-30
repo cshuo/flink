@@ -10,54 +10,101 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.apache.flink.table.planner.calcite.hint.FlinkHintStrategies.JOIN_HINT_MATCHER;
+
 /**
  * todo add doc.
  */
 public class BuiltInHintCatalog {
 
-	private static final Hints.Hint BROADCAST_JOIN =
+	/**
+	 * Broadcast hash join.
+	 */
+	private static final Hints.Hint USE_BROADCAST =
 		new Hints.JoinHint(
-			"BROADCAST",
+			"USE_BROADCAST",
 			Hints.JoinHintType.BHJ,
-			FlinkHintStrategies.JOIN) {
+			FlinkHintStrategies.and(FlinkHintStrategies.JOIN,
+				FlinkHintStrategies.explicit(JOIN_HINT_MATCHER))) {
 			@Override
 			public boolean validateHint(RelHint hint) {
 				return hint.kvOptions.isEmpty() && !hint.listOptions.isEmpty();
 			}
 		};
 
-	private static final Hints.Hint NO_HASH_JOIN =
+	/**
+	 * Shuffle hash join.
+	 */
+	private static final Hints.Hint USE_SHUFFLE_HASH =
 		new Hints.JoinHint(
-			"NO_HASH_JOIN",
-			Hints.JoinHintType.NHJ,
-			FlinkHintStrategies.JOIN) {
+			"USE_HASH",
+			Hints.JoinHintType.SHJ,
+			FlinkHintStrategies.and(FlinkHintStrategies.JOIN,
+				FlinkHintStrategies.explicit(JOIN_HINT_MATCHER))) {
 			@Override
 			public boolean validateHint(RelHint hint) {
 				return hint.listOptions.isEmpty() && hint.kvOptions.isEmpty();
 			}
 		};
 
-	private static final Hints.Hint USE_HASH_JOIN =
+	/**
+	 * Sort merge join.
+	 */
+	private static final Hints.Hint USE_SORT_MERGE =
 		new Hints.JoinHint(
-			"USE_HASH_JOIN",
-			Hints.JoinHintType.UHJ,
-			FlinkHintStrategies.JOIN) {
+			"USE_MERGE",
+			Hints.JoinHintType.SMJ,
+			FlinkHintStrategies.and(FlinkHintStrategies.JOIN,
+				FlinkHintStrategies.explicit(JOIN_HINT_MATCHER))) {
 			@Override
 			public boolean validateHint(RelHint hint) {
 				return !hint.listOptions.isEmpty() && hint.kvOptions.isEmpty();
 			}
 		};
 
-	private static final Hints.Hint USE_NL =
+	/**
+	 * Nested loop join.
+	 */
+	private static final Hints.Hint USE_NESTED_LOOP =
 		new Hints.JoinHint(
 			"USE_NL",
-			Hints.JoinHintType.UNL,
-			FlinkHintStrategies.JOIN) {
+			Hints.JoinHintType.NLJ,
+			FlinkHintStrategies.and(FlinkHintStrategies.JOIN,
+				FlinkHintStrategies.explicit(JOIN_HINT_MATCHER))) {
 			@Override
 			public boolean validateHint(RelHint hint) {
 				return !hint.listOptions.isEmpty() && hint.kvOptions.isEmpty();
 			}
 		};
+
+	private static final Hints.Hint NO_HASH =
+		new Hints.JoinHint("NO_USE_HASH", Hints.JoinHintType.NHJ, FlinkHintStrategies.JOIN) {
+			@Override
+			public boolean validateHint(RelHint hint) {
+				// listOptions can be empty or some specified tables to be joined.
+				return hint.kvOptions.isEmpty();
+			}
+		};
+
+	private static final Hints.Hint NO_SORT_MERGE =
+		new Hints.JoinHint("NO_USE_MERGE", Hints.JoinHintType.NMJ, FlinkHintStrategies.JOIN) {
+			@Override
+			public boolean validateHint(RelHint hint) {
+				// listOptions can be empty or some specified tables to be joined.
+				return hint.kvOptions.isEmpty();
+			}
+		};
+
+	private static final Hints.Hint NO_NESTED_LOOP =
+		new Hints.JoinHint("NO_USE_NL", Hints.JoinHintType.NNLJ, FlinkHintStrategies.JOIN) {
+			@Override
+			public boolean validateHint(RelHint hint) {
+				// listOptions can be empty or some specified tables to be joined.
+				return hint.kvOptions.isEmpty();
+			}
+		};
+
+
 
 	private static final Hints.Hint RESOURCE_CONSTRAINT =
 		new Hints.Hint(
@@ -71,6 +118,28 @@ public class BuiltInHintCatalog {
 				List<String> validResource = Arrays.asList("MEM", "CPU", "GPU");
 				return !hint.kvOptions.isEmpty()
 					&& HintUtils.isValidOptions(hint.kvOptions.keySet(), validResource);
+			}
+		};
+
+	private static final Hints.Hint TABLE_PROPERTIES =
+		new Hints.Hint(
+			"PROPERTIES",
+			Hints.HintCategory.TABLE_SCAN,
+			FlinkHintStrategies.TABLE_SCAN) {
+			@Override
+			public boolean validateHint(RelHint hint) {
+				return !hint.kvOptions.isEmpty();
+			}
+		};
+
+	private static final Hints.Hint TABLE_SKEW_INFO =
+		new Hints.Hint(
+			"SKEW_INFO",
+			Hints.HintCategory.TABLE_SCAN,
+			FlinkHintStrategies.JOIN) {
+			@Override
+			public boolean validateHint(RelHint hint) {
+				return !hint.kvOptions.isEmpty();
 			}
 		};
 
@@ -90,13 +159,22 @@ public class BuiltInHintCatalog {
 		};
 
 	public static final Map<String, Hints.Hint> BUILT_IN_HINTS = new HashMap<String, Hints.Hint>() {{
-		put(BROADCAST_JOIN.getHintName(), BROADCAST_JOIN);
-		put(NO_HASH_JOIN.getHintName(), NO_HASH_JOIN);
-		put(USE_HASH_JOIN.getHintName(), USE_HASH_JOIN);
-		put(USE_NL.getHintName(), USE_NL);
+		put(USE_BROADCAST.getHintName(), USE_BROADCAST);
+		put(USE_SHUFFLE_HASH.getHintName(), USE_SHUFFLE_HASH);
+		put(USE_SORT_MERGE.getHintName(), USE_SORT_MERGE);
+		put(USE_NESTED_LOOP.getHintName(), USE_NESTED_LOOP);
 		put(RESOURCE_CONSTRAINT.getHintName(), RESOURCE_CONSTRAINT);
 		put(STREAM_AGG_STRATEGY.getHintName(), STREAM_AGG_STRATEGY);
+		put(TABLE_PROPERTIES.getHintName(), TABLE_PROPERTIES);
+		put(TABLE_SKEW_INFO.getHintName(), TABLE_SKEW_INFO);
+		put(NO_HASH.getHintName(), NO_HASH);
+		put(NO_SORT_MERGE.getHintName(), NO_SORT_MERGE);
+		put(NO_NESTED_LOOP.getHintName(), NO_NESTED_LOOP);
 	}};
+
+	public static Hints.Hint getHintSpec(RelHint hint) {
+		return BUILT_IN_HINTS.get(hint.hintName.toLowerCase());
+	}
 
 	public static final HintStrategyTable HINT_STRATEGY_TABLE = createHintStrategyTable();
 

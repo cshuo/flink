@@ -20,19 +20,21 @@ package org.apache.flink.table.planner.plan.utils
 
 import org.apache.flink.table.api.{TableConfig, TableException}
 import org.apache.flink.table.planner.codegen.{CodeGeneratorContext, ExprCodeGenerator, FunctionCodeGenerator}
+import org.apache.flink.table.planner.utils.TableConfigUtils.isOperatorDisabled
 import org.apache.flink.table.runtime.generated.GeneratedJoinCondition
 import org.apache.flink.table.types.logical.LogicalType
-
 import org.apache.calcite.plan.RelOptUtil
-import org.apache.calcite.rel.RelNode
-import org.apache.calcite.rel.core.{Join, JoinInfo}
+import org.apache.calcite.rel.{RelNode, RelVisitor}
+import org.apache.calcite.rel.core.{Join, JoinInfo, TableScan}
 import org.apache.calcite.rex.{RexBuilder, RexNode}
-import org.apache.calcite.util.ImmutableIntList
+import org.apache.calcite.util.{ImmutableIntList, Util}
 import org.apache.calcite.util.mapping.IntPair
 
+import scala.collection.mutable
 import java.util
 
-import scala.collection.mutable
+import org.apache.calcite.plan.volcano.RelSubset
+import org.apache.flink.table.planner.plan.schema.FlinkPreparingTableBase
 
 /**
   * Util for [[Join]]s.
@@ -137,5 +139,57 @@ object JoinUtil {
       ctx,
       "ConditionFunction",
       body)
+  }
+
+  def isJoinTypeApplicable(
+      join: Join,
+      operatorType: OperatorType,
+      tableConfig: TableConfig): Boolean = {
+    val joinInfo = join.analyzeCondition
+    val isJoinTypeEnabled = !isOperatorDisabled(tableConfig, operatorType)
+    if (operatorType == OperatorType.NestedLoopJoin) {
+      return isJoinTypeEnabled
+    }
+    !joinInfo.pairs().isEmpty && isJoinTypeEnabled
+  }
+
+  /**
+   * Get tables names of the left and right input TableScan of a Join.
+   */
+  def getJoinTableNames(join: Join): (Option[String], Option[String]) = {
+    val relVisitor = new RelVisitor {
+      var endVisiting = false
+      var tableName: Option[String] = Option.empty
+
+      override def visit(node: RelNode, ordinal: Int, parent: RelNode): Unit = {
+        node match {
+          case r: RelSubset => visit(r.getBest, ordinal, parent)
+          case _ =>
+            if (ordinal > 0) {
+              endVisiting = true
+            }
+            if (endVisiting) {
+              return
+            }
+            if (node.isInstanceOf[TableScan]) {
+              tableName = Option(Util.last(
+                node.getTable.asInstanceOf[FlinkPreparingTableBase].getNames))
+            }
+            super.visit(node, ordinal, parent)
+        }
+      }
+
+      def reset(): Unit = {
+        endVisiting = false
+        tableName = Option.empty
+      }
+    }
+    relVisitor.go(join.getLeft)
+    val leftName = relVisitor.tableName
+
+    relVisitor.reset()
+    relVisitor.go(join.getRight)
+    val rightName = relVisitor.tableName
+    (leftName, rightName)
   }
 }

@@ -18,12 +18,15 @@
 
 package org.apache.flink.table.planner.plan.nodes.logical
 
-import org.apache.flink.table.planner.plan.nodes.FlinkConventions
+import java.util
 
+import com.google.common.collect.ImmutableList
+import org.apache.flink.table.planner.plan.nodes.FlinkConventions
 import org.apache.calcite.plan._
 import org.apache.calcite.rel.RelNode
 import org.apache.calcite.rel.convert.ConverterRule
 import org.apache.calcite.rel.core.{CorrelationId, Join, JoinRelType}
+import org.apache.calcite.rel.hint.RelHint
 import org.apache.calcite.rel.logical.LogicalJoin
 import org.apache.calcite.rel.metadata.RelMetadataQuery
 import org.apache.calcite.rex.RexNode
@@ -37,11 +40,13 @@ import scala.collection.JavaConversions._
 class FlinkLogicalJoin(
     cluster: RelOptCluster,
     traitSet: RelTraitSet,
+    hints: ImmutableList[RelHint],
     left: RelNode,
     right: RelNode,
     condition: RexNode,
     joinType: JoinRelType)
-  extends Join(cluster, traitSet, left, right, condition, Set.empty[CorrelationId], joinType)
+  extends Join(cluster, traitSet, hints, left, right,
+    condition, Set.empty[CorrelationId], joinType)
   with FlinkLogicalRel {
 
   override def copy(
@@ -51,7 +56,18 @@ class FlinkLogicalJoin(
       right: RelNode,
       joinType: JoinRelType,
       semiJoinDone: Boolean): Join = {
-    new FlinkLogicalJoin(cluster, traitSet, left, right, conditionExpr, joinType)
+    new FlinkLogicalJoin(cluster, traitSet, hints, left, right, conditionExpr, joinType)
+  }
+
+  override def withHints(hints: util.List[RelHint]): RelNode = {
+    new FlinkLogicalJoin(
+      cluster,
+      traitSet,
+      ImmutableList.copyOf(hints.iterator()),
+      left,
+      right,
+      condition,
+      joinType)
   }
 
   override def computeSelfCost(planner: RelOptPlanner, mq: RelMetadataQuery): RelOptCost = {
@@ -89,7 +105,11 @@ private class FlinkLogicalJoinConverter
     val join = rel.asInstanceOf[LogicalJoin]
     val newLeft = RelOptRule.convert(join.getLeft, FlinkConventions.LOGICAL)
     val newRight = RelOptRule.convert(join.getRight, FlinkConventions.LOGICAL)
-    FlinkLogicalJoin.create(newLeft, newRight, join.getCondition, join.getJoinType)
+    FlinkLogicalJoin.create(
+      newLeft,
+      newRight,
+      join.getCondition,
+      join.getJoinType).withHints(join.getHints)
   }
 }
 
@@ -103,6 +123,7 @@ object FlinkLogicalJoin {
       joinType: JoinRelType): FlinkLogicalJoin = {
     val cluster = left.getCluster
     val traitSet = cluster.traitSetOf(FlinkConventions.LOGICAL).simplify()
-    new FlinkLogicalJoin(cluster, traitSet, left, right, conditionExpr, joinType)
+    new FlinkLogicalJoin(
+      cluster, traitSet, ImmutableList.of(), left, right, conditionExpr, joinType)
   }
 }

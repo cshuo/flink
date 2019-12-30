@@ -38,6 +38,10 @@ class JoinTest extends TableTestBase {
   }
 
   @Test
+  def testGetJoinTableName(): Unit = {
+  }
+
+  @Test
   def testInnerJoinWithEqualPk(): Unit = {
     val query1 = "SELECT SUM(a2) AS a2, a1 FROM A GROUP BY a1"
     val query2 = "SELECT SUM(b2) AS b2, b1 FROM B GROUP BY b1"

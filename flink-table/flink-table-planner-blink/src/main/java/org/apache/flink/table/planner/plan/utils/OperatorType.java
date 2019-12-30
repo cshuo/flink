@@ -26,6 +26,8 @@ import org.apache.flink.table.api.config.ExecutionConfigOptions;
  */
 public enum OperatorType {
 
+	HashJoin,
+
 	NestedLoopJoin,
 
 	ShuffleHashJoin,

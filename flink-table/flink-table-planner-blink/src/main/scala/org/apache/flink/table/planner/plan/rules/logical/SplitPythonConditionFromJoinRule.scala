@@ -59,6 +59,7 @@ class SplitPythonConditionFromJoinRule extends RelOptRule(
     val bottomJoin = new FlinkLogicalJoin(
       join.getCluster,
       join.getTraitSet,
+      join.getHints,
       join.getLeft,
       join.getRight,
       newJoinCondition,

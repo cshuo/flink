@@ -11,7 +11,7 @@ public class Hints {
 		private HintStrategy hintStrategy;
 
 		public Hint(String hintName, HintCategory hintCategory, HintStrategy hintStrategy) {
-			this.hintName = hintName;
+			this.hintName = hintName.toLowerCase();
 			this.hintCategory = hintCategory;
 			this.hintStrategy = hintStrategy;
 		}
@@ -45,12 +45,16 @@ public class Hints {
 			this.joinHintType = joinType;
 		}
 
+		public JoinHintType getJoinHintType() {
+			return joinHintType;
+		}
+
 		public int compareTo(JoinHint o) {
 			return this.joinHintType.compareTo(o.joinHintType);
 		}
 	}
 
-	enum HintCategory {
+	public enum HintCategory {
 		/** Hints for Join */
 		JOIN,
 		/** Hints for Resource Constraint */
@@ -64,14 +68,20 @@ public class Hints {
 	/**
 	 * Types of join (Batch mode).
 	 */
-	enum JoinHintType {
+	public enum JoinHintType {
 		/** Broadcast hash join */
 		BHJ,
+		/** Shuffle hash join */
+		SHJ,
+		/** Sort merge join */
+		SMJ,
+		/** Nest loop join */
+		NLJ,
 		/** No hash join */
 		NHJ,
-		/** Use hash join */
-		UHJ,
-		/** Use nest loop join */
-		UNL
+		/** No sort merge join*/
+		NMJ,
+		/** No nested loop join */
+		NNLJ
 	}
 }
