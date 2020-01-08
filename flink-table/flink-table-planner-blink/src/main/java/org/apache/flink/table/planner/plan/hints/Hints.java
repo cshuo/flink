@@ -3,8 +3,14 @@ package org.apache.flink.table.planner.plan.hints;
 import org.apache.calcite.rel.hint.HintStrategy;
 import org.apache.calcite.rel.hint.RelHint;
 
+/**
+ * todo add doc.
+ */
 public class Hints {
 
+	/**
+	 * todo doc.
+	 */
 	public abstract static class Hint {
 		private String hintName;
 		private HintCategory hintCategory;
@@ -35,7 +41,7 @@ public class Hints {
 	}
 
 	/**
-	 *  Join hints
+	 *  Join hints.
 	 **/
 	public abstract static class JoinHint extends Hint implements Comparable<JoinHint> {
 		private JoinHintType joinHintType;
@@ -54,14 +60,17 @@ public class Hints {
 		}
 	}
 
+	/**
+	 * todo doc.
+	 */
 	public enum HintCategory {
-		/** Hints for Join */
+		/** Hints for Join. */
 		JOIN,
-		/** Hints for Resource Constraint */
+		/** Hints for Resource Constraint. */
 		RESOURCE_CONSTRAINT,
-		/** Hints for planner feature */
+		/** Hints for planner feature. */
 		PLANNER_FEATURE,
-		/** Hints for table scan */
+		/** Hints for table scan. */
 		TABLE_SCAN
 	}
 
@@ -69,19 +78,19 @@ public class Hints {
 	 * Types of join (Batch mode).
 	 */
 	public enum JoinHintType {
-		/** Broadcast hash join */
+		/** Broadcast hash join. */
 		BHJ,
-		/** Shuffle hash join */
+		/** Shuffle hash join. */
 		SHJ,
-		/** Sort merge join */
+		/** Sort merge join. */
 		SMJ,
-		/** Nest loop join */
+		/** Nest loop join. */
 		NLJ,
-		/** No hash join */
+		/** No hash join. */
 		NHJ,
-		/** No sort merge join*/
+		/** No sort merge join. */
 		NMJ,
-		/** No nested loop join */
+		/** No nested loop join. */
 		NNLJ
 	}
 }

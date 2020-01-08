@@ -1,11 +1,15 @@
 package org.apache.flink.table.planner.calcite.hint;
 
-import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.hint.HintStrategy;
-import org.apache.calcite.rel.hint.RelHint;
 import org.apache.flink.table.planner.plan.nodes.physical.batch.BatchExecGroupAggregateBase;
 import org.apache.flink.table.planner.plan.nodes.physical.stream.StreamExecGroupAggregateBase;
 
+import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.hint.HintStrategy;
+import org.apache.calcite.rel.hint.RelHint;
+
+/**
+ * todo add doc.
+ */
 public class FlinkNodeTypeHintStrategy implements HintStrategy {
 
 	/**
@@ -21,7 +25,6 @@ public class FlinkNodeTypeHintStrategy implements HintStrategy {
 		 */
 		BATCH_GROUP_AGGREGTE(BatchExecGroupAggregateBase.class);
 
-		/** todo */
 		private Class<?> relClazz;
 
 		NodeType(Class<?> relClazz) {

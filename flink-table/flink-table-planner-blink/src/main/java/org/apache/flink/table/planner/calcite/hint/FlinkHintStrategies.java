@@ -1,20 +1,22 @@
 package org.apache.flink.table.planner.calcite.hint;
 
+import org.apache.flink.table.planner.plan.utils.JoinUtil;
+import org.apache.flink.table.types.inference.strategies.ExplicitTypeStrategy;
+
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.hint.ExplicitHintMatcher;
 import org.apache.calcite.rel.hint.HintStrategies;
 import org.apache.calcite.rel.hint.HintStrategy;
 import org.apache.calcite.rel.logical.LogicalJoin;
-import org.apache.calcite.util.Util;
-import org.apache.flink.table.planner.plan.utils.JoinUtil;
-import org.apache.flink.table.types.inference.strategies.ExplicitTypeStrategy;
+
+import java.util.List;
+
 import scala.Option;
 import scala.Tuple2;
 
-import java.util.List;
-import java.util.stream.Collectors;
-
+/**
+ * todo add doc.
+ */
 public class FlinkHintStrategies extends HintStrategies {
 	public static final HintStrategy STREAM_GROUP_AGGREGATE =
 		new FlinkNodeTypeHintStrategy(FlinkNodeTypeHintStrategy.NodeType.STREAM_GROUP_AGGREGTE);
@@ -23,7 +25,7 @@ public class FlinkHintStrategies extends HintStrategies {
 		new FlinkNodeTypeHintStrategy(FlinkNodeTypeHintStrategy.NodeType.BATCH_GROUP_AGGREGTE);
 
 	/**
-	 * A join hint matcher for an {@link ExplicitTypeStrategy}
+	 * A join hint matcher for an {@link ExplicitTypeStrategy}.
 	 */
 	public static final ExplicitHintMatcher<RelNode> JOIN_HINT_MATCHER =
 		(hint, rel) -> {

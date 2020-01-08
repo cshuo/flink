@@ -26,6 +26,7 @@ import org.apache.calcite.config.NullCollation
 import org.apache.calcite.plan._
 import org.apache.calcite.prepare.CalciteCatalogReader
 import org.apache.calcite.rel.`type`.RelDataType
+import org.apache.calcite.rel.hint.RelHint
 import org.apache.calcite.rel.{RelFieldCollation, RelRoot}
 import org.apache.calcite.sql.advise.{SqlAdvisor, SqlAdvisorValidator}
 import org.apache.calcite.sql.{SqlKind, SqlNode, SqlOperatorTable}
@@ -49,7 +50,8 @@ class FlinkPlannerImpl(
     config: FrameworkConfig,
     catalogReaderSupplier: JFunction[JBoolean, CalciteCatalogReader],
     typeFactory: FlinkTypeFactory,
-    cluster: RelOptCluster) extends FlinkToRelContext {
+    val cluster: RelOptCluster)
+  extends RelOptTable.ViewExpander with RelOptTable.ToRelContextSupplier {
 
   val operatorTable: SqlOperatorTable = config.getOperatorTable
   val parser: CalciteParser = new CalciteParser(config.getParserConfig)
@@ -159,16 +161,6 @@ class FlinkPlannerImpl(
     }
   }
 
-  /**
-    * Creates a new instance of [[SqlExprToRexConverter]] to convert SQL expression
-    * to RexNode.
-    */
-  def createSqlExprToRexConverter(tableRowType: RelDataType): SqlExprToRexConverter = {
-    new SqlExprToRexConverterImpl(config, typeFactory, cluster, tableRowType)
-  }
-
-  override def getCluster: RelOptCluster = cluster
-
   override def expandView(
       rowType: RelDataType,
       queryString: String,
@@ -188,10 +180,38 @@ class FlinkPlannerImpl(
     rel(validated, validator)
   }
 
-  override def createRelBuilder(): FlinkRelBuilder = {
-    sqlToRelConverterConfig.getRelBuilderFactory
-      .create(cluster, null)
-      .asInstanceOf[FlinkRelBuilder]
+  override def get(
+      viewExpander: RelOptTable.ViewExpander,
+      cluster: RelOptCluster,
+      hints: util.List[RelHint]): RelOptTable.ToRelContext = {
+
+    new FlinkToRelContext {
+      /**
+       * Creates a new instance of [[SqlExprToRexConverter]] to convert SQL expression
+       * to RexNode.
+       */
+      override def createSqlExprToRexConverter(tableRowType: RelDataType)
+      : SqlExprToRexConverter = {
+        new SqlExprToRexConverterImpl(config, typeFactory, cluster, tableRowType)
+      }
+
+      override def createRelBuilder(): FlinkRelBuilder = {
+        sqlToRelConverterConfig.getRelBuilderFactory
+          .create(cluster, null)
+          .asInstanceOf[FlinkRelBuilder]
+      }
+
+      override def getCluster: RelOptCluster = cluster
+
+      override def getTableHints: util.List[RelHint] = hints
+
+      override def expandView(
+          rowType: RelDataType,
+          queryString: String,
+          schemaPath: util.List[String],
+          viewPath: util.List[String]): RelRoot =
+        viewExpander.expandView(rowType, queryString, schemaPath, viewPath)
+    }
   }
 }
 

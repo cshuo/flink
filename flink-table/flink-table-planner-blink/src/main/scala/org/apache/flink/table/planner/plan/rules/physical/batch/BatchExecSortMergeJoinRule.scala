@@ -54,6 +54,10 @@ class BatchExecSortMergeJoinRule
     val join: Join = call.rel(0)
     val joinInfo = join.analyzeCondition
     val tableConfig = call.getPlanner.getContext.unwrap(classOf[FlinkContext]).getTableConfig
+    // join keys must not be empty.
+    if (joinInfo.pairs().isEmpty) {
+      return false
+    }
 
     val hintJoinType = HintUtils.getApplicableJoinHintType(join, tableConfig)
     if (hintJoinType.isPresent) {
@@ -64,8 +68,7 @@ class BatchExecSortMergeJoinRule
       }
     }
 
-    val isSortMergeJoinEnabled = !isOperatorDisabled(tableConfig, OperatorType.SortMergeJoin)
-    !joinInfo.pairs().isEmpty && isSortMergeJoinEnabled
+    !isOperatorDisabled(tableConfig, OperatorType.SortMergeJoin)
   }
 
   override def onMatch(call: RelOptRuleCall): Unit = {

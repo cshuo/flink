@@ -174,7 +174,7 @@ class CatalogTableITCase(isStreamingMode: Boolean) extends AbstractTestBase {
     val query =
       """
         |insert into t2
-        |select t1.a, t1.b, (t1.a + 1) as c , d from t1
+        |select t1.a, t1.b, (t1.a + 1) as c , d from t1 /*+ properties(k1='v1', k2='v2')*/
       """.stripMargin
     tableEnv.sqlUpdate(sourceDDL)
     tableEnv.sqlUpdate(sinkDDL)
@@ -205,7 +205,6 @@ class CatalogTableITCase(isStreamingMode: Boolean) extends AbstractTestBase {
        |  WATERMARK FOR ts AS ts
        |) WITH (
        |  'connector.type' = 'filesystem',
-       |  'connector.path' = '$tempFilePath',
        |  'format.type' = 'csv',
        |  'format.field-delimiter' = ',',
        |  'format.line-delimiter' = '#'
@@ -231,14 +230,14 @@ class CatalogTableITCase(isStreamingMode: Boolean) extends AbstractTestBase {
     tableEnv.sqlUpdate(sinkDDL)
 
     val query =
-      """
+      s"""
         |INSERT INTO T2
         |SELECT
         |  TUMBLE_END(ts, INTERVAL '5' SECOND),
         |  MAX(ts6),
         |  COUNT(*),
         |  MAX(price)
-        |FROM T1
+        |FROM T1 /*+ properties(`connector.path` = '$tempFilePath')*/
         |GROUP BY TUMBLE(ts, INTERVAL '5' SECOND)
       """.stripMargin
     tableEnv.sqlUpdate(query)

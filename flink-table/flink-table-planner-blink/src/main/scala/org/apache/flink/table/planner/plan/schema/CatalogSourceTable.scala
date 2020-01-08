@@ -19,7 +19,7 @@
 package org.apache.flink.table.planner.plan.schema
 
 import org.apache.flink.table.api.TableException
-import org.apache.flink.table.catalog.{CatalogTable, ObjectIdentifier}
+import org.apache.flink.table.catalog.CatalogTable
 import org.apache.flink.table.factories.{TableFactoryUtil, TableSourceFactory}
 import org.apache.flink.table.sources.{StreamTableSource, TableSource, TableSourceValidation}
 import org.apache.calcite.rel.`type`.RelDataType
@@ -28,8 +28,9 @@ import org.apache.flink.table.planner.catalog.CatalogSchemaTable
 import org.apache.calcite.plan.{RelOptSchema, RelOptTable}
 import org.apache.calcite.rel.RelNode
 import org.apache.calcite.rel.logical.LogicalTableScan
-
 import java.util.{List => JList}
+
+import org.apache.flink.table.planner.plan.utils.HintUtils
 
 import scala.collection.JavaConverters._
 import scala.collection.JavaConversions._
@@ -60,12 +61,14 @@ class CatalogSourceTable[T](
       .toMap
   }
 
-  lazy val tableSource: TableSource[T] = findAndCreateTableSource().asInstanceOf[TableSource[T]]
-
-  override def getQualifiedName: JList[String] = explainSourceAsString(tableSource)
-
   override def toRel(context: RelOptTable.ToRelContext): RelNode = {
     val cluster = context.getCluster
+    // add and merge table properties specified in table hints.
+    val hints = context.getTableHints
+    catalogTable.getProperties.putAll(HintUtils.getHintedTableProperties(hints))
+
+    val tableSource: TableSource[T] = findAndCreateTableSource().asInstanceOf[TableSource[T]]
+
     val tableSourceTable = new TableSourceTable[T](
       relOptSchema,
       schemaTable.getTableIdentifier,

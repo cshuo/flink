@@ -1,9 +1,10 @@
 package org.apache.flink.table.planner.plan.hints;
 
-import org.apache.calcite.rel.hint.HintStrategyTable;
-import org.apache.calcite.rel.hint.RelHint;
 import org.apache.flink.table.planner.calcite.hint.FlinkHintStrategies;
 import org.apache.flink.table.planner.plan.utils.HintUtils;
+
+import org.apache.calcite.rel.hint.HintStrategyTable;
+import org.apache.calcite.rel.hint.RelHint;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -148,8 +149,8 @@ public class BuiltInHintCatalog {
 			"AGG_STRATEGY",
 			Hints.HintCategory.PLANNER_FEATURE,
 			FlinkHintStrategies.or(
-			    FlinkHintStrategies.AGGREGATE,
-			    FlinkHintStrategies.STREAM_GROUP_AGGREGATE)) {
+				FlinkHintStrategies.AGGREGATE,
+				FlinkHintStrategies.STREAM_GROUP_AGGREGATE)) {
 			@Override
 			public boolean validateHint(RelHint hint) {
 				List<String> validStrategy = Arrays.asList("TWO_PHASE", "ONE_PHASE");

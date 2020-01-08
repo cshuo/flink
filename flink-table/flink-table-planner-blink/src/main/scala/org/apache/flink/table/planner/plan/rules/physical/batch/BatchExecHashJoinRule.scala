@@ -54,6 +54,11 @@ class BatchExecHashJoinRule
   override def matches(call: RelOptRuleCall): Boolean = {
     val tableConfig = call.getPlanner.getContext.unwrap(classOf[FlinkContext]).getTableConfig
     val join: Join = call.rel(0)
+    val joinInfo = join.analyzeCondition
+    // join keys must not be empty
+    if (joinInfo.pairs().isEmpty) {
+      return false
+    }
 
     val hintJoinType = HintUtils.getApplicableJoinHintType(join, tableConfig)
     // There exists applicable join hint.
@@ -64,12 +69,6 @@ class BatchExecHashJoinRule
         return hintJoinType.get() == JoinHintType.BHJ ||
           hintJoinType.get() ==JoinHintType.SHJ
       }
-    }
-
-    val joinInfo = join.analyzeCondition
-    // join keys must not be empty
-    if (joinInfo.pairs().isEmpty) {
-      return false
     }
 
     val isShuffleHashJoinEnabled = !isOperatorDisabled(tableConfig, OperatorType.ShuffleHashJoin)

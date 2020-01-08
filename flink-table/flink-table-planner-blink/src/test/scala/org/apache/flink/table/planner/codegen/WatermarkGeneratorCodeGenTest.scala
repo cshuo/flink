@@ -24,18 +24,16 @@ import org.apache.flink.table.api.TableConfig
 import org.apache.flink.table.catalog.{CatalogManager, FunctionCatalog, GenericInMemoryCatalog, ObjectIdentifier}
 import org.apache.flink.table.dataformat.{GenericRow, SqlTimestamp}
 import org.apache.flink.table.module.ModuleManager
-import org.apache.flink.table.planner.calcite.{FlinkPlannerImpl, FlinkTypeFactory}
+import org.apache.flink.table.planner.calcite.{FlinkPlannerImpl, FlinkToRelContext, FlinkTypeFactory}
 import org.apache.flink.table.planner.catalog.CatalogManagerCalciteSchema
 import org.apache.flink.table.planner.delegation.PlannerContext
 import org.apache.flink.table.planner.runtime.utils.JavaUserDefinedScalarFunctions.JavaFunc5
 import org.apache.flink.table.runtime.generated.WatermarkGenerator
 import org.apache.flink.table.types.logical.{IntType, TimestampType}
-
 import org.apache.calcite.jdbc.CalciteSchemaBuilder.asRootSchema
 import org.apache.calcite.plan.ConventionTraitDef
 import org.junit.Assert.{assertEquals, assertTrue}
 import org.junit.Test
-
 import java.lang.{Integer => JInt, Long => JLong}
 import java.util.Collections
 
@@ -130,7 +128,8 @@ class WatermarkGeneratorCodeGenTest {
         new IntType()
       ))
     val rowType = FlinkTypeFactory.toLogicalRowType(tableRowType)
-    val converter = planner.createSqlExprToRexConverter(tableRowType)
+    val converter = planner.get(planner, planner.cluster, Collections.emptyList())
+      .asInstanceOf[FlinkToRelContext].createSqlExprToRexConverter(tableRowType)
     val rexNode = converter.convertToRexNode(expr)
     val generated = WatermarkGeneratorCodeGenerator
       .generateWatermarkGenerator(new TableConfig(), rowType, rexNode)

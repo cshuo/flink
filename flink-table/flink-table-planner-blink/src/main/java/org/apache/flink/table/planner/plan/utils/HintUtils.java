@@ -1,16 +1,15 @@
 package org.apache.flink.table.planner.plan.utils;
 
-import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.core.Join;
-import org.apache.calcite.rel.hint.RelHint;
-import org.apache.flink.api.dag.Transformation;
 import org.apache.flink.table.api.TableConfig;
 import org.apache.flink.table.planner.plan.hints.BuiltInHintCatalog;
-import org.apache.flink.table.planner.plan.hints.Hints.JoinHintType;
 import org.apache.flink.table.planner.plan.hints.Hints.Hint;
 import org.apache.flink.table.planner.plan.hints.Hints.HintCategory;
 import org.apache.flink.table.planner.plan.hints.Hints.JoinHint;
-import scala.Option;
+import org.apache.flink.table.planner.plan.hints.Hints.JoinHintType;
+
+import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.core.Join;
+import org.apache.calcite.rel.hint.RelHint;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -22,13 +21,15 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
+import scala.Option;
+
 import static org.apache.flink.table.planner.plan.hints.Hints.JoinHintType.BHJ;
 import static org.apache.flink.table.planner.plan.hints.Hints.JoinHintType.NLJ;
 import static org.apache.flink.table.planner.plan.hints.Hints.JoinHintType.SHJ;
 import static org.apache.flink.table.planner.plan.hints.Hints.JoinHintType.SMJ;
 
 /**
- * Utilities for {@link Hint}
+ * Utilities for {@link Hint}.
  */
 public class HintUtils {
 
@@ -43,12 +44,6 @@ public class HintUtils {
 			}
 		}
 		return true;
-	}
-
-	/**
-	 * TODO: set resource to the transformation.
-	 */
-	public static void applyHintResourceConstraint(Transformation<?> ret, RelHint hint) {
 	}
 
 	/**
@@ -84,17 +79,27 @@ public class HintUtils {
 	}
 
 	/**
+	 * Only table properties hints are supported currently.
+	 */
+	public static Map<String, String> getHintedTableProperties(Collection<RelHint> hints) {
+		Map<String, String> properties = new HashMap<>();
+		for (RelHint hint: eliminateCommonHints(hints)) {
+			properties.putAll(hint.kvOptions);
+		}
+		return properties;
+	}
+
+	/**
 	 * Returns an join operation {@link OperatorType} specified in join Hints,
 	 * which is also must be applicable to the {@link Join} node, taking the
 	 * global table config and join info into account.
-	 *
 	 * If multiple join operation hints are supplied, they are prioritized as
 	 * "BHJ" over "SMJ" over "SHJ" over "NLJ".
 	 */
 	public static Optional<JoinHintType> getApplicableJoinHintType(
 		Join join, TableConfig tableConfig) {
 
-		List<RelHint> hints = join.getHints();
+		Collection<RelHint> hints = eliminateCommonHints(join.getHints());
 		Set<JoinHint> joinHints = new TreeSet<>();
 		for (RelHint hint: hints) {
 			Hint hintSpec = BuiltInHintCatalog.getHintSpec(hint);
@@ -111,21 +116,25 @@ public class HintUtils {
 						join, OperatorType.BroadcastHashJoin, tableConfig)) {
 						return Optional.of(BHJ);
 					}
+					break;
 				case SHJ:
 					if (JoinUtil.isJoinTypeApplicable(
 						join, OperatorType.ShuffleHashJoin, tableConfig)) {
 						return Optional.of(SHJ);
 					}
+					break;
 				case SMJ:
 					if (JoinUtil.isJoinTypeApplicable(
 						join, OperatorType.SortMergeJoin, tableConfig)) {
 						return Optional.of(SMJ);
 					}
+					break;
 				case NLJ:
 					if (JoinUtil.isJoinTypeApplicable(
 						join, OperatorType.NestedLoopJoin, tableConfig)) {
 						return Optional.of(NLJ);
 					}
+					break;
 				default:
 					return Optional.of(hintSpec.getJoinHintType());
 			}
@@ -148,13 +157,13 @@ public class HintUtils {
 		Option<String> right,
 		List<RelHint> hints,
 		JoinHintType joinHintType) {
-		// todo: there may exists more than 2 table names in the hint
-		// todo: filter out the table names of the join inputs.
+		// there may exists more than 2 table names in the hint
+		// filter out the table names of the join inputs.
 		List<String> result = new ArrayList<>();
-		for (RelHint hint: hints) {
+		for (RelHint hint: eliminateCommonHints(hints)) {
 			Hint hintSpec = BuiltInHintCatalog.getHintSpec(hint);
 			if (hintSpec.getHintCategory() == HintCategory.JOIN
-				&& ((JoinHint)hintSpec).getJoinHintType() == joinHintType) {
+				&& ((JoinHint) hintSpec).getJoinHintType() == joinHintType) {
 				if (left.isDefined() && hint.listOptions.contains(left.get())) {
 					result.add(left.get());
 				}
