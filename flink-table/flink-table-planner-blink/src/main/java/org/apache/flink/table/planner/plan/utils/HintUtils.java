@@ -1,7 +1,7 @@
 package org.apache.flink.table.planner.plan.utils;
 
 import org.apache.flink.table.api.TableConfig;
-import org.apache.flink.table.planner.plan.hints.BuiltInHintCatalog;
+import org.apache.flink.table.planner.plan.hints.BuiltInHintTable;
 import org.apache.flink.table.planner.plan.hints.Hints.Hint;
 import org.apache.flink.table.planner.plan.hints.Hints.HintCategory;
 import org.apache.flink.table.planner.plan.hints.Hints.JoinHint;
@@ -9,6 +9,7 @@ import org.apache.flink.table.planner.plan.hints.Hints.JoinHintType;
 
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Join;
+import org.apache.calcite.rel.hint.HintOptionChecker;
 import org.apache.calcite.rel.hint.RelHint;
 
 import java.util.ArrayList;
@@ -33,6 +34,16 @@ import static org.apache.flink.table.planner.plan.hints.Hints.JoinHintType.SMJ;
  */
 public class HintUtils {
 
+	public static final HintOptionChecker LIST_OPTION_CHECKER =
+		(hint, errorHandler) -> errorHandler.check(
+			hint.kvOptions.isEmpty(),
+			"Hint {} only allows list options.", hint.hintName);
+
+	public static final HintOptionChecker KV_OPTION_CHECKER =
+		(hint, errorHandler) -> errorHandler.check(
+			hint.listOptions.isEmpty(),
+			"Hint {} only allows KV options.", hint.hintName);
+
 	/**
 	 * Check whether the hints in SQL are valid.
 	 */
@@ -44,17 +55,6 @@ public class HintUtils {
 			}
 		}
 		return true;
-	}
-
-	/**
-	 * Validate user hints in SQL according to
-	 * the specification of hints in {@link BuiltInHintCatalog}.
-	 */
-	public static void validateHint(RelHint hint) {
-		Hint hintSpec = BuiltInHintCatalog.getHintSpec(hint);
-		if (!hintSpec.validateHint(hint)) {
-			throw new IllegalArgumentException("Invalid hint options: " + hint.toString());
-		}
 	}
 
 	/**
@@ -102,7 +102,7 @@ public class HintUtils {
 		Collection<RelHint> hints = eliminateCommonHints(join.getHints());
 		Set<JoinHint> joinHints = new TreeSet<>();
 		for (RelHint hint: hints) {
-			Hint hintSpec = BuiltInHintCatalog.getHintSpec(hint);
+			Hint hintSpec = BuiltInHintTable.getHintSpec(hint);
 			if (hintSpec != null &&
 				HintCategory.JOIN == hintSpec.getHintCategory()) {
 				joinHints.add((JoinHint) hintSpec);
@@ -161,7 +161,7 @@ public class HintUtils {
 		// filter out the table names of the join inputs.
 		List<String> result = new ArrayList<>();
 		for (RelHint hint: eliminateCommonHints(hints)) {
-			Hint hintSpec = BuiltInHintCatalog.getHintSpec(hint);
+			Hint hintSpec = BuiltInHintTable.getHintSpec(hint);
 			if (hintSpec.getHintCategory() == HintCategory.JOIN
 				&& ((JoinHint) hintSpec).getJoinHintType() == joinHintType) {
 				if (left.isDefined() && hint.listOptions.contains(left.get())) {

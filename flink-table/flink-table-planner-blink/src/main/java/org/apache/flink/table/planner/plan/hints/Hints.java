@@ -1,7 +1,7 @@
 package org.apache.flink.table.planner.plan.hints;
 
+import org.apache.calcite.rel.hint.HintOptionChecker;
 import org.apache.calcite.rel.hint.HintStrategy;
-import org.apache.calcite.rel.hint.RelHint;
 
 /**
  * todo add doc.
@@ -15,17 +15,18 @@ public class Hints {
 		private String hintName;
 		private HintCategory hintCategory;
 		private HintStrategy hintStrategy;
+		private HintOptionChecker hintOptionChecker;
 
-		public Hint(String hintName, HintCategory hintCategory, HintStrategy hintStrategy) {
+		public Hint(
+			String hintName,
+			HintCategory hintCategory,
+			HintStrategy hintStrategy,
+			HintOptionChecker hintOptionChecker) {
 			this.hintName = hintName.toLowerCase();
 			this.hintCategory = hintCategory;
+			this.hintOptionChecker = hintOptionChecker;
 			this.hintStrategy = hintStrategy;
 		}
-
-		/**
-		 * Validate the content of the {@link RelHint}.
-		 */
-		public abstract boolean validateHint(RelHint hint);
 
 		public String getHintName() {
 			return hintName;
@@ -38,16 +39,24 @@ public class Hints {
 		public HintCategory getHintCategory() {
 			return hintCategory;
 		}
+
+		public HintOptionChecker getHintOptionChecker() {
+			return hintOptionChecker;
+		}
 	}
 
 	/**
 	 *  Join hints.
 	 **/
-	public abstract static class JoinHint extends Hint implements Comparable<JoinHint> {
+	public static class JoinHint extends Hint implements Comparable<JoinHint> {
 		private JoinHintType joinHintType;
 
-		public JoinHint(String hintName, JoinHintType joinType, HintStrategy hintStrategy) {
-			super(hintName, HintCategory.JOIN, hintStrategy);
+		public JoinHint(
+			String hintName,
+			JoinHintType joinType,
+			HintStrategy hintStrategy,
+			HintOptionChecker hintOptionChecker) {
+			super(hintName, HintCategory.JOIN, hintStrategy, hintOptionChecker);
 			this.joinHintType = joinType;
 		}
 

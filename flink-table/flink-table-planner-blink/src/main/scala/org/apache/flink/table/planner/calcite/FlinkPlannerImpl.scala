@@ -51,7 +51,7 @@ class FlinkPlannerImpl(
     catalogReaderSupplier: JFunction[JBoolean, CalciteCatalogReader],
     typeFactory: FlinkTypeFactory,
     val cluster: RelOptCluster)
-  extends RelOptTable.ViewExpander with RelOptTable.ToRelContextSupplier {
+  extends RelOptTable.ViewExpander with RelOptTable.ToRelContextFactory {
 
   val operatorTable: SqlOperatorTable = config.getOperatorTable
   val parser: CalciteParser = new CalciteParser(config.getParserConfig)
@@ -180,7 +180,7 @@ class FlinkPlannerImpl(
     rel(validated, validator)
   }
 
-  override def get(
+  override def createToRelContext(
       viewExpander: RelOptTable.ViewExpander,
       cluster: RelOptCluster,
       hints: util.List[RelHint]): RelOptTable.ToRelContext = {

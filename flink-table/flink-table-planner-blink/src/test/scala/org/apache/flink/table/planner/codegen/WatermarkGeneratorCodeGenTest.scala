@@ -128,7 +128,7 @@ class WatermarkGeneratorCodeGenTest {
         new IntType()
       ))
     val rowType = FlinkTypeFactory.toLogicalRowType(tableRowType)
-    val converter = planner.get(planner, planner.cluster, Collections.emptyList())
+    val converter = planner.createToRelContext(planner, planner.cluster, Collections.emptyList())
       .asInstanceOf[FlinkToRelContext].createSqlExprToRexConverter(tableRowType)
     val rexNode = converter.convertToRexNode(expr)
     val generated = WatermarkGeneratorCodeGenerator
