@@ -277,7 +277,7 @@ public class PlannerContext {
 						.withInSubQueryThreshold(Integer.MAX_VALUE)
 						.withExpand(false)
 						.withRelBuilderFactory(FlinkRelFactories.FLINK_REL_BUILDER())
-						.withHintStrategyTable(BuiltInHintTable.HINT_STRATEGY_TABLE)
+						.withHintStrategyTable(BuiltInHintTable.createHintStrategyTable())
 						.build()
 		);
 	}

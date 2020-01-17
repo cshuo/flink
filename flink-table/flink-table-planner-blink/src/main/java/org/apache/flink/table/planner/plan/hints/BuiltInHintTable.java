@@ -1,11 +1,13 @@
 package org.apache.flink.table.planner.plan.hints;
 
+import org.apache.flink.table.api.TableException;
 import org.apache.flink.table.planner.calcite.hint.FlinkHintStrategies;
 import org.apache.flink.table.planner.plan.utils.HintUtils;
 
 import org.apache.calcite.rel.hint.HintStrategyTable;
 import org.apache.calcite.rel.hint.RelHint;
 
+import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -121,33 +123,37 @@ public class BuiltInHintTable {
 					"Hint {} only allows single option: [ONE_PHASE, TWO_PHASE]",
 					hint.hintName); }) {};
 
-	public static final Map<String, Hints.Hint> BUILT_IN_HINTS = new HashMap<String, Hints.Hint>() {{
-		put(USE_BROADCAST.getHintName(), USE_BROADCAST);
-		put(USE_SHUFFLE_HASH.getHintName(), USE_SHUFFLE_HASH);
-		put(USE_SORT_MERGE.getHintName(), USE_SORT_MERGE);
-		put(USE_NESTED_LOOP.getHintName(), USE_NESTED_LOOP);
-		put(RESOURCE_CONSTRAINT.getHintName(), RESOURCE_CONSTRAINT);
-		put(STREAM_AGG_STRATEGY.getHintName(), STREAM_AGG_STRATEGY);
-		put(TABLE_PROPERTIES.getHintName(), TABLE_PROPERTIES);
-		put(NO_HASH.getHintName(), NO_HASH);
-		put(NO_SORT_MERGE.getHintName(), NO_SORT_MERGE);
-		put(NO_NESTED_LOOP.getHintName(), NO_NESTED_LOOP);
-	}};
+	public static final Map<String, Hints.Hint> BUILT_IN_HINTS = new HashMap<>();
 
 	public static Hints.Hint getHintSpec(RelHint hint) {
 		return BUILT_IN_HINTS.get(hint.hintName.toLowerCase());
 	}
 
-	public static final HintStrategyTable HINT_STRATEGY_TABLE = createHintStrategyTable();
+	private static HintStrategyTable hintStrategyTable;
 
-	private static HintStrategyTable createHintStrategyTable() {
-		HintStrategyTable.Builder builder = HintStrategyTable.builder();
-		for (Hints.Hint hint: BUILT_IN_HINTS.values()) {
-			builder.addHintStrategy(
-				hint.getHintName(),
-				hint.getHintStrategy(),
-				hint.getHintOptionChecker());
+	public static HintStrategyTable createHintStrategyTable() {
+		if (hintStrategyTable != null) {
+			return hintStrategyTable;
 		}
-		return builder.build();
+		HintStrategyTable.Builder builder = HintStrategyTable.builder();
+		// Use reflection to register hint into HintStrategyTable.
+		BuiltInHintTable builtInHintTable = new BuiltInHintTable();
+		for (Field field : BuiltInHintTable.class.getDeclaredFields()) {
+			if (!Hints.Hint.class.isAssignableFrom(field.getType())) {
+				continue;
+			}
+			try {
+				Hints.Hint hint = (Hints.Hint) field.get(builtInHintTable);
+				BUILT_IN_HINTS.put(hint.getHintName(), hint);
+				builder.addHintStrategy(
+					hint.getHintName(),
+					hint.getHintStrategy(),
+					hint.getHintOptionChecker());
+			} catch (IllegalAccessException e) {
+				throw new TableException(e.getMessage());
+			}
+		}
+		hintStrategyTable = builder.build();
+		return hintStrategyTable;
 	}
 }
