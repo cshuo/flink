@@ -20,8 +20,8 @@ package org.apache.flink.sql.parser.ddl;
 
 import org.apache.flink.sql.parser.ExtendedSqlNode;
 import org.apache.flink.sql.parser.error.SqlValidateException;
+import org.apache.flink.sql.parser.type.ExtendedSqlRowTypeNameSpec;
 
-import org.apache.calcite.sql.ExtendedSqlRowTypeNameSpec;
 import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlCharStringLiteral;
