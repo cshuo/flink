@@ -25,10 +25,12 @@ import org.apache.flink.table.runtime.operators.rank.{RankRange, RankType}
 import org.apache.flink.table.sinks.TableSink
 
 import com.google.common.collect.ImmutableList
+import org.apache.calcite.plan.RelOptTable.ToRelContext
 import org.apache.calcite.plan.{Contexts, RelOptCluster, RelOptTable}
 import org.apache.calcite.rel.`type`.{RelDataType, RelDataTypeField}
 import org.apache.calcite.rel.core.RelFactories._
 import org.apache.calcite.rel.core._
+import org.apache.calcite.rel.hint.RelHint
 import org.apache.calcite.rel.logical._
 import org.apache.calcite.rel.{RelCollation, RelNode}
 import org.apache.calcite.rex._
@@ -82,6 +84,7 @@ object FlinkLogicalRelFactories {
   class ProjectFactoryImpl extends ProjectFactory {
     def createProject(
         input: RelNode,
+        hints: util.List[RelHint],
         childExprs: util.List[_ <: RexNode],
         fieldNames: util.List[String]): RelNode = {
       val rexBuilder = input.getCluster.getRexBuilder
@@ -91,7 +94,7 @@ object FlinkLogicalRelFactories {
         case (childExpr, fieldName) => programBuilder.addProject(childExpr, fieldName)
       }
       val program = programBuilder.getProgram
-      FlinkLogicalCalc.create(input, program)
+      FlinkLogicalCalc.create(input, hints, program)
     }
   }
 
@@ -134,10 +137,11 @@ object FlinkLogicalRelFactories {
   class AggregateFactoryImpl extends AggregateFactory {
     def createAggregate(
         input: RelNode,
+        hints: util.List[RelHint],
         groupSet: ImmutableBitSet,
         groupSets: ImmutableList[ImmutableBitSet],
         aggCalls: util.List[AggregateCall]): RelNode = {
-      FlinkLogicalAggregate.create(input, groupSet, groupSets, aggCalls)
+      FlinkLogicalAggregate.create(input, hints, groupSet, groupSets, aggCalls)
     }
   }
 
@@ -157,7 +161,7 @@ object FlinkLogicalRelFactories {
       programBuilder.addIdentity()
       programBuilder.addCondition(condition)
       val program = programBuilder.getProgram
-      FlinkLogicalCalc.create(input, program)
+      FlinkLogicalCalc.create(input, ImmutableList.of(), program)
     }
   }
 
@@ -168,11 +172,12 @@ object FlinkLogicalRelFactories {
     def createJoin(
         left: RelNode,
         right: RelNode,
+        hints: util.List[RelHint],
         condition: RexNode,
         variablesSet: util.Set[CorrelationId],
         joinType: JoinRelType,
         semiJoinDone: Boolean): RelNode = {
-      FlinkLogicalJoin.create(left, right, condition, joinType)
+      FlinkLogicalJoin.create(left, right, hints, condition, joinType)
     }
   }
 
@@ -208,15 +213,21 @@ object FlinkLogicalRelFactories {
     * [[FlinkLogicalTableSourceScan]] or [[FlinkLogicalDataStreamTableScan]].
     */
   class TableScanFactoryImpl extends TableScanFactory {
-    def createScan(cluster: RelOptCluster, table: RelOptTable): RelNode = {
-      val tableScan = LogicalTableScan.create(cluster, table)
+    def createScan(toRelContext: ToRelContext, table: RelOptTable): RelNode = {
+      val cluster = toRelContext.getCluster
+      val hints = toRelContext.getTableHints
+      val tableScan = LogicalTableScan.create(cluster, table, hints)
       tableScan match {
         case s: LogicalTableScan if FlinkLogicalTableSourceScan.isTableSourceScan(s) =>
-          FlinkLogicalTableSourceScan.create(cluster,
-            s.getTable.asInstanceOf[FlinkPreparingTableBase])
+          FlinkLogicalTableSourceScan.create(
+            cluster,
+            s.getTable.asInstanceOf[FlinkPreparingTableBase],
+            hints)
         case s: LogicalTableScan if FlinkLogicalDataStreamTableScan.isDataStreamTableScan(s) =>
-          FlinkLogicalDataStreamTableScan.create(cluster,
-            s.getTable.asInstanceOf[FlinkPreparingTableBase])
+          FlinkLogicalDataStreamTableScan.create(
+            cluster,
+            s.getTable.asInstanceOf[FlinkPreparingTableBase],
+            hints)
       }
     }
   }

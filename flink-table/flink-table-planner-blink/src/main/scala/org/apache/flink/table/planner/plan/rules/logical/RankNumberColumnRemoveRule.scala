@@ -21,6 +21,7 @@ package org.apache.flink.table.planner.plan.rules.logical
 import org.apache.flink.table.planner.plan.nodes.logical.{FlinkLogicalCalc, FlinkLogicalRank}
 import org.apache.flink.table.runtime.operators.rank.{ConstantRankRange, RankType}
 
+import com.google.common.collect.ImmutableList
 import org.apache.calcite.plan.RelOptRule.{any, operand}
 import org.apache.calcite.plan.{RelOptRule, RelOptRuleCall}
 import org.apache.calcite.rex.RexProgramBuilder
@@ -74,7 +75,7 @@ class RankNumberColumnRemoveRule
     }
 
     val rexProgram = programBuilder.getProgram
-    val calc = FlinkLogicalCalc.create(newRank, rexProgram)
+    val calc = FlinkLogicalCalc.create(newRank, ImmutableList.of(), rexProgram)
     call.transformTo(calc)
   }
 }

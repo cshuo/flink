@@ -30,6 +30,8 @@ import org.apache.flink.table.planner.delegation.StreamPlanner
 import org.apache.flink.table.planner.plan.nodes.common.CommonCalc
 import org.apache.flink.table.planner.plan.nodes.exec.{ExecNode, StreamExecNode}
 
+import com.google.common.collect.ImmutableList
+
 import scala.collection.JavaConversions._
 
 /**
@@ -41,7 +43,7 @@ abstract class StreamExecCalcBase(
     inputRel: RelNode,
     calcProgram: RexProgram,
     outputRowType: RelDataType)
-  extends CommonCalc(cluster, traitSet, inputRel, calcProgram)
+  extends CommonCalc(cluster, traitSet, ImmutableList.of(),inputRel, calcProgram)
   with StreamPhysicalRel
   with StreamExecNode[BaseRow] {
 

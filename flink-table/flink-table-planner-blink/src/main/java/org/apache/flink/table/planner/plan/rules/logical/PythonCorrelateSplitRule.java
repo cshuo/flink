@@ -37,6 +37,7 @@ import org.apache.calcite.rex.RexProgram;
 import org.apache.calcite.rex.RexProgramBuilder;
 import org.apache.calcite.sql.validate.SqlValidatorUtil;
 
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -144,6 +145,7 @@ public class PythonCorrelateSplitRule extends RelOptRule {
 		return new FlinkLogicalCalc(
 			correlate.getCluster(),
 			correlate.getTraitSet(),
+			Collections.emptyList(),
 			left,
 			RexProgram.create(
 				leftRowType,
@@ -176,6 +178,7 @@ public class PythonCorrelateSplitRule extends RelOptRule {
 		return new FlinkLogicalCalc(
 			newCorrelate.getCluster(),
 			newCorrelate.getTraitSet(),
+			Collections.emptyList(),
 			newCorrelate,
 			RexProgram.create(
 				newCorrelate.getRowType(),

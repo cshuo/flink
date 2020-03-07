@@ -25,6 +25,8 @@ import org.apache.calcite.rex.{RexProgram, RexProgramBuilder, RexUtil}
 import org.apache.flink.table.planner.plan.nodes.logical.{FlinkLogicalCalc, FlinkLogicalJoin}
 import org.apache.flink.table.planner.plan.utils.PythonUtil.containsPythonCall
 
+import com.google.common.collect.ImmutableList
+
 import scala.collection.JavaConversions._
 
 /**
@@ -58,6 +60,7 @@ class SplitPythonConditionFromJoinRule extends RelOptRule(
     val bottomJoin = new FlinkLogicalJoin(
       join.getCluster,
       join.getTraitSet,
+      ImmutableList.of(),
       join.getLeft,
       join.getRight,
       newJoinCondition,
@@ -69,6 +72,7 @@ class SplitPythonConditionFromJoinRule extends RelOptRule(
     val topCalc = new FlinkLogicalCalc(
       join.getCluster,
       join.getTraitSet,
+      ImmutableList.of(),
       bottomJoin,
       RexProgram.create(
         bottomJoin.getRowType,

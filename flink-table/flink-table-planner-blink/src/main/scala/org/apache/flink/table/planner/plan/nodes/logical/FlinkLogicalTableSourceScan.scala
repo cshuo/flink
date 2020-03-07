@@ -18,6 +18,7 @@
 
 package org.apache.flink.table.planner.plan.nodes.logical
 
+import org.apache.flink.table.planner.JList
 import org.apache.flink.table.planner.plan.nodes.FlinkConventions
 import org.apache.flink.table.planner.plan.nodes.logical.FlinkLogicalTableSourceScan.isTableSourceScan
 import org.apache.flink.table.planner.plan.schema.{FlinkPreparingTableBase, TableSourceTable}
@@ -28,6 +29,7 @@ import org.apache.calcite.plan._
 import org.apache.calcite.rel.`type`.RelDataType
 import org.apache.calcite.rel.convert.ConverterRule
 import org.apache.calcite.rel.core.TableScan
+import org.apache.calcite.rel.hint.RelHint
 import org.apache.calcite.rel.logical.LogicalTableScan
 import org.apache.calcite.rel.metadata.RelMetadataQuery
 import org.apache.calcite.rel.{RelCollation, RelCollationTraitDef, RelNode, RelWriter}
@@ -42,8 +44,9 @@ import java.util.function.Supplier
 class FlinkLogicalTableSourceScan(
     cluster: RelOptCluster,
     traitSet: RelTraitSet,
+    hints: JList[RelHint],
     relOptTable: TableSourceTable[_])
-  extends TableScan(cluster, traitSet, relOptTable)
+  extends TableScan(cluster, traitSet, hints, relOptTable)
   with FlinkLogicalRel {
 
   lazy val tableSource: TableSource[_] = tableSourceTable.tableSource
@@ -53,11 +56,11 @@ class FlinkLogicalTableSourceScan(
   def copy(
       traitSet: RelTraitSet,
       tableSourceTable: TableSourceTable[_]): FlinkLogicalTableSourceScan = {
-    new FlinkLogicalTableSourceScan(cluster, traitSet, tableSourceTable)
+    new FlinkLogicalTableSourceScan(cluster, traitSet, getHints, tableSourceTable)
   }
 
   override def copy(traitSet: RelTraitSet, inputs: java.util.List[RelNode]): RelNode = {
-    new FlinkLogicalTableSourceScan(cluster, traitSet, relOptTable)
+    new FlinkLogicalTableSourceScan(cluster, traitSet, getHints, relOptTable)
   }
 
   override def deriveRowType(): RelDataType = {
@@ -77,6 +80,9 @@ class FlinkLogicalTableSourceScan(
       .item("fields", tableSource.getTableSchema.getFieldNames.mkString(", "))
   }
 
+  override def withHints(hintList: JList[RelHint]): RelNode = {
+    new FlinkLogicalTableSourceScan(cluster, traitSet, hintList, relOptTable)
+  }
 }
 
 class FlinkLogicalTableSourceScanConverter
@@ -94,7 +100,7 @@ class FlinkLogicalTableSourceScanConverter
   def convert(rel: RelNode): RelNode = {
     val scan = rel.asInstanceOf[TableScan]
     val table = scan.getTable.asInstanceOf[FlinkPreparingTableBase]
-    FlinkLogicalTableSourceScan.create(rel.getCluster, table)
+    FlinkLogicalTableSourceScan.create(rel.getCluster, table, ImmutableList.of())
   }
 }
 
@@ -106,7 +112,10 @@ object FlinkLogicalTableSourceScan {
     tableSourceTable != null
   }
 
-  def create(cluster: RelOptCluster, relOptTable: FlinkPreparingTableBase)
+  def create(
+      cluster: RelOptCluster,
+      relOptTable: FlinkPreparingTableBase,
+      hints: JList[RelHint])
       : FlinkLogicalTableSourceScan = {
     val table = relOptTable.unwrap(classOf[TableSourceTable[_]])
     val traitSet = cluster.traitSetOf(FlinkConventions.LOGICAL).replaceIfs(
@@ -119,6 +128,6 @@ object FlinkLogicalTableSourceScan {
           }
         }
       }).simplify()
-    new FlinkLogicalTableSourceScan(cluster, traitSet, table)
+    new FlinkLogicalTableSourceScan(cluster, traitSet, hints, table)
   }
 }

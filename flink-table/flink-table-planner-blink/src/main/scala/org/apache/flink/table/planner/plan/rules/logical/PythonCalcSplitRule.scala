@@ -30,6 +30,8 @@ import org.apache.flink.table.planner.plan.nodes.logical.FlinkLogicalCalc
 import org.apache.flink.table.planner.plan.utils.PythonUtil.{containsNonPythonCall, containsPythonCall, isNonPythonCall, isPythonCall}
 import org.apache.flink.table.planner.plan.utils.{InputRefVisitor, RexDefaultVisitor}
 
+import com.google.common.collect.ImmutableList
+
 import scala.collection.JavaConverters._
 import scala.collection.JavaConversions._
 import scala.collection.mutable
@@ -73,6 +75,7 @@ abstract class PythonCalcSplitRuleBase(description: String)
     val bottomCalc = new FlinkLogicalCalc(
       calc.getCluster,
       calc.getTraitSet,
+      ImmutableList.of(),
       input,
       RexProgram.create(
         input.getRowType,
@@ -85,6 +88,7 @@ abstract class PythonCalcSplitRuleBase(description: String)
     val topCalc = new FlinkLogicalCalc(
       calc.getCluster,
       calc.getTraitSet,
+      ImmutableList.of(),
       bottomCalc,
       RexProgram.create(
         bottomCalc.getRowType,

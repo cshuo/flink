@@ -27,6 +27,8 @@ import org.apache.flink.table.planner.plan.rules.physical.stream.StreamExecCorre
 import org.apache.flink.table.planner.plan.utils.PythonUtil.containsPythonCall
 import org.apache.flink.table.planner.plan.utils.RexDefaultVisitor
 
+import com.google.common.collect.ImmutableList
+
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
 
@@ -76,6 +78,7 @@ class SplitPythonConditionFromCorrelateRule
     val newBottomCalc = new FlinkLogicalCalc(
       mergedCalc.getCluster,
       mergedCalc.getTraitSet,
+      ImmutableList.of(),
       input,
       RexProgram.create(
         input.getRowType,
@@ -106,6 +109,7 @@ class SplitPythonConditionFromCorrelateRule
     val newTopCalc = new FlinkLogicalCalc(
       newCorrelate.getCluster,
       newCorrelate.getTraitSet,
+      ImmutableList.of(),
       newCorrelate,
       RexProgram.create(
         newCorrelate.getRowType,
