@@ -274,7 +274,6 @@ public class PlannerContext {
 		return JavaScalaConversionUtil.toJava(calciteConfig.getSqlToRelConverterConfig()).orElseGet(
 				() -> SqlToRelConverter.configBuilder()
 						.withTrimUnusedFields(false)
-						.withConvertTableAccess(true)
 						.withInSubQueryThreshold(Integer.MAX_VALUE)
 						.withExpand(false)
 						.withRelBuilderFactory(FlinkRelFactories.FLINK_REL_BUILDER())

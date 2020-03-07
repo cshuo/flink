@@ -20,16 +20,17 @@ package org.apache.flink.table.planner.plan.schema
 
 import org.apache.flink.configuration.ReadableConfig
 import org.apache.flink.table.api.TableException
-import org.apache.flink.table.catalog.CatalogTable
+import org.apache.flink.table.catalog.{CatalogTable, CatalogTableImpl}
 import org.apache.flink.table.factories.{TableFactoryUtil, TableSourceFactory, TableSourceFactoryContextImpl}
 import org.apache.flink.table.planner.calcite.{FlinkContext, FlinkRelBuilder}
 import org.apache.flink.table.planner.catalog.CatalogSchemaTable
+import org.apache.flink.table.planner.plan.hint.FlinkHints
 import org.apache.flink.table.sources.{StreamTableSource, TableSource, TableSourceValidation}
-import org.apache.flink.table.utils.TableConnectorUtils.generateRuntimeName
 
 import org.apache.calcite.plan.{RelOptSchema, RelOptTable}
 import org.apache.calcite.rel.RelNode
 import org.apache.calcite.rel.`type`.RelDataType
+import org.apache.calcite.rel.hint.RelHint
 import org.apache.calcite.rel.logical.LogicalTableScan
 
 import java.util
@@ -64,15 +65,6 @@ class CatalogSourceTable[T](
       .toMap
   }
 
-  override def getQualifiedName: JList[String] = {
-    // Do not explain source, we already have full names, table source should be created in toRel.
-    val ret = new util.ArrayList[String](names)
-    // Add class name to distinguish TableSourceTable.
-    val name = generateRuntimeName(getClass, catalogTable.getSchema.getFieldNames)
-    ret.add(s"catalog_source: [$name]")
-    ret
-  }
-
   override def toRel(context: RelOptTable.ToRelContext): RelNode = {
     val cluster = context.getCluster
     val flinkContext = cluster
@@ -80,7 +72,9 @@ class CatalogSourceTable[T](
         .getContext
         .unwrap(classOf[FlinkContext])
 
-    val tableSource = findAndCreateTableSource(flinkContext.getTableConfig.getConfiguration)
+    val tableSource = findAndCreateTableSource(
+      flinkContext.getTableConfig.getConfiguration,
+      context.getTableHints)
     val tableSourceTable = new TableSourceTable[T](
       relOptSchema,
       schemaTable.getTableIdentifier,
@@ -100,7 +94,7 @@ class CatalogSourceTable[T](
       .toArray
     // Copy this table with physical scan row type.
     val newRelTable = tableSourceTable.copy(tableSource, physicalFields)
-    val scan = LogicalTableScan.create(cluster, newRelTable)
+    val scan = LogicalTableScan.create(cluster, newRelTable, context.getTableHints)
     val relBuilder = FlinkRelBuilder.of(cluster, getRelOptSchema)
     relBuilder.push(scan)
 
@@ -150,10 +144,25 @@ class CatalogSourceTable[T](
   }
 
   /** Create the table source. */
-  private def findAndCreateTableSource(conf: ReadableConfig): TableSource[T] = {
+  private def findAndCreateTableSource(
+      conf: ReadableConfig,
+      tableHints: JList[RelHint]): TableSource[T] = {
     val tableFactoryOpt = schemaTable.getTableFactory
+    val hintedProperties = FlinkHints.getHintedProperties(tableHints)
+    var catalogTableWithHints = catalogTable
+    if (hintedProperties.nonEmpty) {
+      val mergedProperties = new util.HashMap[String, String](catalogTable.getProperties)
+      mergedProperties.putAll(hintedProperties)
+      // Creates a new CatalogTableImpl instance with properties overridden by hinted ones.
+      // We better refactor out the table factory from CatalogTable.
+      catalogTableWithHints = new CatalogTableImpl(
+        catalogTable.getSchema,
+        catalogTable.getPartitionKeys,
+        mergedProperties,
+        catalogTable.getComment)
+    }
     val context = new TableSourceFactoryContextImpl(
-      schemaTable.getTableIdentifier, catalogTable, conf)
+      schemaTable.getTableIdentifier, catalogTableWithHints, conf)
     val tableSource = if (tableFactoryOpt.isPresent) {
       tableFactoryOpt.get() match {
         case tableSourceFactory: TableSourceFactory[_] =>
