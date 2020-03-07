@@ -49,6 +49,8 @@ import org.apache.flink.table.runtime.operators.rank.{ConstantRankRange, RankTyp
 import org.apache.flink.table.types.AtomicDataType
 import org.apache.flink.table.types.logical.{BigIntType, DoubleType, IntType, LogicalType, TimestampKind, TimestampType, VarCharType}
 import org.apache.flink.table.types.utils.TypeConversions
+import org.apache.flink.table.utils.CatalogManagerMocks
+
 import com.google.common.collect.{ImmutableList, Lists}
 import org.apache.calcite.jdbc.CalciteSchema
 import org.apache.calcite.plan._
@@ -57,7 +59,7 @@ import org.apache.calcite.rel._
 import org.apache.calcite.rel.`type`.{RelDataType, RelDataTypeFieldImpl}
 import org.apache.calcite.rel.core.{AggregateCall, Calc, JoinInfo, JoinRelType, Project, Window}
 import org.apache.calcite.rel.logical.{LogicalAggregate, LogicalProject, LogicalSort, LogicalTableScan, LogicalValues}
-import org.apache.calcite.rel.metadata.{JaninoRelMetadataProvider, RelMetadataQuery}
+import org.apache.calcite.rel.metadata.{JaninoRelMetadataProvider, RelMetadataQuery, RelMetadataQueryBase}
 import org.apache.calcite.rex._
 import org.apache.calcite.schema.SchemaPlus
 import org.apache.calcite.sql.SqlWindow
@@ -68,10 +70,9 @@ import org.apache.calcite.sql.fun.{SqlCountAggFunction, SqlStdOperatorTable}
 import org.apache.calcite.sql.parser.SqlParserPos
 import org.apache.calcite.util.{DateString, ImmutableBitSet, ImmutableIntList, TimeString, TimestampString}
 import org.junit.{Before, BeforeClass}
+
 import java.math.BigDecimal
 import java.util
-
-import org.apache.flink.table.utils.CatalogManagerMocks
 
 import scala.collection.JavaConversions._
 
@@ -812,7 +813,12 @@ class FlinkRelMdHandlerTestBase {
     val flinkLogicalWindowAgg = new FlinkLogicalWindowTableAggregate(
       ts.getCluster,
       logicalTraits,
-      new FlinkLogicalCalc(ts.getCluster, flinkLogicalTraits, flinkLogicalTs, program),
+      new FlinkLogicalCalc(
+        ts.getCluster,
+        flinkLogicalTraits,
+        ImmutableList.of(),
+        flinkLogicalTs,
+        program),
       ImmutableBitSet.of(1),
       ImmutableList.of(ImmutableBitSet.of(1)),
       aggCallOfWindowAgg,
@@ -874,6 +880,7 @@ class FlinkRelMdHandlerTestBase {
     val flinkLogicalAgg = new FlinkLogicalAggregate(
       cluster,
       flinkLogicalTraits,
+      ImmutableList.of(),
       studentFlinkLogicalScan,
       logicalAgg.getGroupSet,
       logicalAgg.getGroupSets,
@@ -1023,6 +1030,7 @@ class FlinkRelMdHandlerTestBase {
     val flinkLogicalAggWithAuxGroup = new FlinkLogicalAggregate(
       cluster,
       flinkLogicalTraits,
+      ImmutableList.of(),
       studentFlinkLogicalScan,
       logicalAggWithAuxGroup.getGroupSet,
       logicalAggWithAuxGroup.getGroupSets,
@@ -1160,7 +1168,12 @@ class FlinkRelMdHandlerTestBase {
     val flinkLogicalWindowAgg = new FlinkLogicalWindowAggregate(
       ts.getCluster,
       logicalTraits,
-      new FlinkLogicalCalc(ts.getCluster, flinkLogicalTraits, flinkLogicalTs, program),
+      new FlinkLogicalCalc(
+        ts.getCluster,
+        flinkLogicalTraits,
+        ImmutableList.of(),
+        flinkLogicalTs,
+        program),
       ImmutableBitSet.of(0, 1),
       aggCallOfWindowAgg,
       tumblingGroupWindow,
@@ -1305,7 +1318,12 @@ class FlinkRelMdHandlerTestBase {
     val flinkLogicalWindowAgg = new FlinkLogicalWindowAggregate(
       ts.getCluster,
       logicalTraits,
-      new FlinkLogicalCalc(ts.getCluster, flinkLogicalTraits, flinkLogicalTs, program),
+      new FlinkLogicalCalc(
+        ts.getCluster,
+        flinkLogicalTraits,
+        ImmutableList.of(),
+        flinkLogicalTs,
+        program),
       ImmutableBitSet.of(1),
       aggCallOfWindowAgg,
       tumblingGroupWindow,
@@ -1452,7 +1470,12 @@ class FlinkRelMdHandlerTestBase {
     val flinkLogicalWindowAggWithAuxGroup = new FlinkLogicalWindowAggregate(
       ts.getCluster,
       logicalTraits,
-      new FlinkLogicalCalc(ts.getCluster, flinkLogicalTraits, flinkLogicalTs, program),
+      new FlinkLogicalCalc(
+        ts.getCluster,
+        flinkLogicalTraits,
+        ImmutableList.of(),
+        flinkLogicalTs,
+        program),
       ImmutableBitSet.of(0),
       aggCallOfWindowAgg,
       tumblingGroupWindow,
@@ -1592,7 +1615,12 @@ class FlinkRelMdHandlerTestBase {
     val flinkLogicalOverAgg = new FlinkLogicalOverAggregate(
       cluster,
       flinkLogicalTraits,
-      new FlinkLogicalCalc(cluster, flinkLogicalTraits, studentFlinkLogicalScan, rexProgram),
+      new FlinkLogicalCalc(
+        cluster,
+        flinkLogicalTraits,
+        ImmutableList.of(),
+        studentFlinkLogicalScan,
+        rexProgram),
       ImmutableList.of(),
       rowTypeOfWindowAgg,
       overAggGroups
@@ -1621,9 +1649,9 @@ class FlinkRelMdHandlerTestBase {
     val flinkLogicalOverAggOutput = new FlinkLogicalCalc(
       cluster,
       flinkLogicalTraits,
+      ImmutableList.of(),
       flinkLogicalOverAgg,
-      projectProgram
-    )
+      projectProgram)
 
     val calc = new BatchExecCalc(
       cluster, batchPhysicalTraits, studentBatchScan, rexProgram, rowTypeOfCalc)
@@ -1774,7 +1802,12 @@ class FlinkRelMdHandlerTestBase {
     val flinkLogicalOverAgg = new FlinkLogicalOverAggregate(
       cluster,
       flinkLogicalTraits,
-      new FlinkLogicalCalc(cluster, flinkLogicalTraits, studentFlinkLogicalScan, rexProgram),
+      new FlinkLogicalCalc(
+        cluster,
+        flinkLogicalTraits,
+        ImmutableList.of(),
+        studentFlinkLogicalScan,
+        rexProgram),
       ImmutableList.of(),
       rowTypeOfWindowAgg,
       util.Arrays.asList(overAggGroups.get(1))
@@ -2364,7 +2397,7 @@ class FlinkRelMdHandlerTestBase {
         val scan = relBuilder.scan(tableNames).build()
         scan.copy(traitSet, scan.getInputs)
       case FlinkConventions.LOGICAL =>
-        new FlinkLogicalDataStreamTableScan(cluster, traitSet, table)
+        new FlinkLogicalDataStreamTableScan(cluster, traitSet, ImmutableList.of(), table)
       case FlinkConventions.BATCH_PHYSICAL =>
         new BatchExecBoundedStreamScan(cluster, traitSet, table, table.getRowType)
       case FlinkConventions.STREAM_PHYSICAL =>
@@ -2417,7 +2450,7 @@ class FlinkRelMdHandlerTestBase {
       predicate,
       outputRowType,
       rexBuilder)
-    FlinkLogicalCalc.create(input, program)
+    FlinkLogicalCalc.create(input, ImmutableList.of(), program)
   }
 
   protected def makeLiteral(
@@ -2446,7 +2479,7 @@ class TestRel(
 object FlinkRelMdHandlerTestBase {
   @BeforeClass
   def beforeAll(): Unit = {
-    RelMetadataQuery
+    RelMetadataQueryBase
       .THREAD_PROVIDERS
       .set(JaninoRelMetadataProvider.of(FlinkDefaultRelMetadataProvider.INSTANCE))
   }
