@@ -34,8 +34,6 @@ import org.apache.calcite.util.ImmutableBitSet;
  */
 public class FlinkRelMetadataQuery extends RelMetadataQuery {
 
-	protected static final FlinkRelMetadataQuery PROTOTYPE = new FlinkRelMetadataQuery(false);
-
 	private FlinkMetadata.ColumnInterval.Handler columnIntervalHandler;
 	private FlinkMetadata.FilteredColumnInterval.Handler filteredColumnInterval;
 	private FlinkMetadata.ColumnNullCount.Handler columnNullCountHandler;
@@ -59,7 +57,7 @@ public class FlinkRelMetadataQuery extends RelMetadataQuery {
 	 * @param mq metadataQuery which try to reuse
 	 * @return a FlinkRelMetadataQuery instance
 	 */
-	public static FlinkRelMetadataQuery reuseOrCreate(RelMetadataQuery mq) {
+	public static <M extends RelMetadataQuery> FlinkRelMetadataQuery reuseOrCreate(M mq) {
 		if (mq instanceof FlinkRelMetadataQuery) {
 			return (FlinkRelMetadataQuery) mq;
 		} else {
@@ -67,29 +65,10 @@ public class FlinkRelMetadataQuery extends RelMetadataQuery {
 		}
 	}
 
-	private FlinkRelMetadataQuery(
-			JaninoRelMetadataProvider metadataProvider,
-			RelMetadataQuery prototype) {
-		super(metadataProvider, prototype);
-	}
-
-	private FlinkRelMetadataQuery() {
-		super(RelMetadataQuery.THREAD_PROVIDERS.get(), RelMetadataQuery.EMPTY);
-		this.columnIntervalHandler = PROTOTYPE.columnIntervalHandler;
-		this.filteredColumnInterval = PROTOTYPE.filteredColumnInterval;
-		this.columnNullCountHandler = PROTOTYPE.columnNullCountHandler;
-		this.columnOriginNullCountHandler = PROTOTYPE.columnOriginNullCountHandler;
-		this.uniqueGroupsHandler = PROTOTYPE.uniqueGroupsHandler;
-		this.distributionHandler = PROTOTYPE.distributionHandler;
-		this.modifiedMonotonicityHandler = PROTOTYPE.modifiedMonotonicityHandler;
-	}
-
 	/**
-	 * Creates and initializes the instance that will serve as a prototype for
-	 * all other instances.
+	 * Creates a FlinkRelMetadataQuery instance.
 	 */
-	private FlinkRelMetadataQuery(boolean dummy) {
-		super(RelMetadataQuery.THREAD_PROVIDERS.get(), RelMetadataQuery.EMPTY);
+	private FlinkRelMetadataQuery() {
 		this.columnIntervalHandler =
 				RelMetadataQuery.initialHandler(FlinkMetadata.ColumnInterval.Handler.class);
 		this.filteredColumnInterval =
