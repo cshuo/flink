@@ -26,18 +26,19 @@ import org.apache.flink.table.catalog.{CatalogTable, ObjectIdentifier}
 import org.apache.flink.table.dataformat.BaseRow
 import org.apache.flink.table.operations.CatalogSinkModifyOperation
 import org.apache.flink.table.planner.calcite.FlinkTypeFactory
-import org.apache.flink.table.planner.plan.utils.RelOptUtils
 import org.apache.flink.table.runtime.types.TypeInfoDataTypeConverter.fromDataTypeToTypeInfo
 import org.apache.flink.table.runtime.typeutils.BaseRowTypeInfo
 import org.apache.flink.table.sinks._
 import org.apache.flink.table.types.DataType
-import org.apache.flink.table.types.inference.TypeTransformations.{legacyDecimalToDefaultDecimal, toNullable, legacyRawToTypeInfoRaw}
+import org.apache.flink.table.types.inference.TypeTransformations.{legacyDecimalToDefaultDecimal, legacyRawToTypeInfoRaw, toNullable}
 import org.apache.flink.table.types.logical.utils.{LogicalTypeCasts, LogicalTypeChecks}
 import org.apache.flink.table.types.logical.{LegacyTypeInformationType, LogicalType, RowType, TypeInformationRawType}
 import org.apache.flink.table.types.utils.DataTypeUtils
 import org.apache.flink.table.types.utils.TypeConversions.{fromLegacyInfoToDataType, fromLogicalToDataType}
 import org.apache.flink.table.utils.{TableSchemaUtils, TypeMappingUtils}
 import org.apache.flink.types.Row
+
+import org.apache.calcite.plan.RelOptUtil
 import org.apache.calcite.rel.RelNode
 
 import _root_.scala.collection.JavaConversions._
@@ -80,7 +81,7 @@ object TableSinkUtils {
         val castedDataType = typeFactory.buildRelNodeRowType(
           sinkLogicalType.getFieldNames,
           sinkLogicalType.getFields.map(_.getType))
-        RelOptUtils.createCastRel(query, castedDataType)
+        RelOptUtil.createCastRel(query, castedDataType, true)
       }
     } else {
       // format query and sink schema strings
