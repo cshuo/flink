@@ -37,30 +37,19 @@ under the License.
 
 	<packaging>jar</packaging>
 
-	<dependencyManagement>
-		<dependencies>
-			<!-- Common dependency of calcite-core and flink-test-utils -->
-			<dependency>
-				<groupId>com.google.guava</groupId>
-				<artifactId>guava</artifactId>
-				<version>19.0</version>
-			</dependency>
-			<!-- Common dependency of calcite-core and janino -->
-			<dependency>
-				<groupId>org.codehaus.janino</groupId>
-				<artifactId>commons-compiler</artifactId>
-				<version>${janino.version}</version>
-			</dependency>
-			<!-- Common dependency of calcite-core and flink-table-planner -->
-			<dependency>
-				<groupId>org.codehaus.janino</groupId>
-				<artifactId>janino</artifactId>
-				<version>${janino.version}</version>
-			</dependency>
-		</dependencies>
-	</dependencyManagement>
-
 	<dependencies>
+		<dependency>
+			<groupId>com.google.guava</groupId>
+			<artifactId>guava</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.codehaus.janino</groupId>
+			<artifactId>commons-compiler</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.codehaus.janino</groupId>
+			<artifactId>janino</artifactId>
+		</dependency>
 
 		<!-- core dependencies -->
 
@@ -90,6 +79,10 @@ under the License.
 				<exclusion>
 					<groupId>org.apache.calcite</groupId>
 					<artifactId>calcite-core</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>com.google.guava</groupId>
+					<artifactId>guava</artifactId>
 				</exclusion>
 			</exclusions>
 		</dependency>

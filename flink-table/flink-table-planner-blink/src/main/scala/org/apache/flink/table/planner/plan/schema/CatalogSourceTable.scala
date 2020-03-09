@@ -20,20 +20,17 @@ package org.apache.flink.table.planner.plan.schema
 
 import org.apache.flink.configuration.ReadableConfig
 import org.apache.flink.table.api.TableException
-import org.apache.flink.table.catalog.{CatalogTable, CatalogTableImpl}
+import org.apache.flink.table.catalog.CatalogTable
 import org.apache.flink.table.factories.{TableFactoryUtil, TableSourceFactory, TableSourceFactoryContextImpl}
 import org.apache.flink.table.planner.calcite.{FlinkContext, FlinkRelBuilder}
 import org.apache.flink.table.planner.catalog.CatalogSchemaTable
-import org.apache.flink.table.planner.plan.hint.FlinkHints
 import org.apache.flink.table.sources.{StreamTableSource, TableSource, TableSourceValidation}
 
 import org.apache.calcite.plan.{RelOptSchema, RelOptTable}
 import org.apache.calcite.rel.RelNode
 import org.apache.calcite.rel.`type`.RelDataType
-import org.apache.calcite.rel.hint.RelHint
 import org.apache.calcite.rel.logical.LogicalTableScan
 
-import java.util
 import java.util.{List => JList}
 
 import scala.collection.JavaConversions._
@@ -72,9 +69,7 @@ class CatalogSourceTable[T](
         .getContext
         .unwrap(classOf[FlinkContext])
 
-    val tableSource = findAndCreateTableSource(
-      flinkContext.getTableConfig.getConfiguration,
-      context.getTableHints)
+    val tableSource = findAndCreateTableSource(flinkContext.getTableConfig.getConfiguration)
     val tableSourceTable = new TableSourceTable[T](
       relOptSchema,
       schemaTable.getTableIdentifier,
@@ -144,25 +139,10 @@ class CatalogSourceTable[T](
   }
 
   /** Create the table source. */
-  private def findAndCreateTableSource(
-      conf: ReadableConfig,
-      tableHints: JList[RelHint]): TableSource[T] = {
+  private def findAndCreateTableSource(conf: ReadableConfig): TableSource[T] = {
     val tableFactoryOpt = schemaTable.getTableFactory
-    val hintedProperties = FlinkHints.getHintedProperties(tableHints)
-    var catalogTableWithHints = catalogTable
-    if (hintedProperties.nonEmpty) {
-      val mergedProperties = new util.HashMap[String, String](catalogTable.getProperties)
-      mergedProperties.putAll(hintedProperties)
-      // Creates a new CatalogTableImpl instance with properties overridden by hinted ones.
-      // We better refactor out the table factory from CatalogTable.
-      catalogTableWithHints = new CatalogTableImpl(
-        catalogTable.getSchema,
-        catalogTable.getPartitionKeys,
-        mergedProperties,
-        catalogTable.getComment)
-    }
     val context = new TableSourceFactoryContextImpl(
-      schemaTable.getTableIdentifier, catalogTableWithHints, conf)
+      schemaTable.getTableIdentifier, catalogTable, conf)
     val tableSource = if (tableFactoryOpt.isPresent) {
       tableFactoryOpt.get() match {
         case tableSourceFactory: TableSourceFactory[_] =>

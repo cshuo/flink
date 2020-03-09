@@ -136,7 +136,8 @@ class FlinkRelBuilder(
     // build logical aggregate
 
     // Because of:
-    // [CALCITE-3763] RelBuilder.aggregate should prune unused fields from the input, if the input is a Project.
+    // [CALCITE-3763] RelBuilder.aggregate should prune unused fields from the input,
+    // if the input is a Project.
     //
     // the field can not be pruned if it is referenced by other expressions
     // of the window aggregation(i.e. the TUMBLE_START/END).

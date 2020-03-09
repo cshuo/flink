@@ -69,10 +69,8 @@ public class SqlCreateTable extends SqlCreate implements ExtendedSqlNode {
 
 	private final SqlNodeList partitionKeyList;
 
-	@Nullable
 	private final SqlWatermark watermark;
 
-	@Nullable
 	private final SqlCharStringLiteral comment;
 
 	public SqlCreateTable(
@@ -83,8 +81,8 @@ public class SqlCreateTable extends SqlCreate implements ExtendedSqlNode {
 			List<SqlNodeList> uniqueKeysList,
 			SqlNodeList propertyList,
 			SqlNodeList partitionKeyList,
-			SqlWatermark watermark,
-			SqlCharStringLiteral comment) {
+			@Nullable SqlWatermark watermark,
+			@Nullable SqlCharStringLiteral comment) {
 		super(OPERATOR, pos, false, false);
 		this.tableName = requireNonNull(tableName, "tableName should not be null");
 		this.columnList = requireNonNull(columnList, "columnList should not be null");
@@ -219,10 +217,12 @@ public class SqlCreateTable extends SqlCreate implements ExtendedSqlNode {
 	 * have been reversed.
 	 */
 	public String getColumnSqlString() {
-		SqlPrettyWriter writer = new SqlPrettyWriter(AnsiSqlDialect.DEFAULT);
-		writer.setAlwaysUseParentheses(true);
-		writer.setSelectListItemsOnSeparateLines(false);
-		writer.setIndentation(0);
+		SqlPrettyWriter writer = new SqlPrettyWriter(
+			SqlPrettyWriter.config()
+				.withDialect(AnsiSqlDialect.DEFAULT)
+				.withAlwaysUseParentheses(true)
+				.withSelectListItemsOnSeparateLines(false)
+				.withIndentation(0));
 		writer.startList("", "");
 		for (SqlNode column : columnList) {
 			writer.sep(",");

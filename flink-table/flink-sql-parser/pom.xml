@@ -41,7 +41,7 @@ under the License.
 		<dependency>
 			<groupId>com.google.guava</groupId>
 			<artifactId>guava</artifactId>
-			<version>19.0</version>
+			<version>${guava.version}</version>
 			<scope>provided</scope>
 		</dependency>
 		<dependency>
@@ -154,6 +154,10 @@ under the License.
 			<artifactId>calcite-core</artifactId>
 			<version>${calcite.version}</version>
 			<exclusions>
+				<exclusion>
+					<groupId>org.apache.calcite.avatica</groupId>
+					<artifactId>avatica-server</artifactId>
+				</exclusion>
 				<exclusion>
 					<groupId>com.fasterxml.jackson.core</groupId>
 					<artifactId>jackson-core</artifactId>
