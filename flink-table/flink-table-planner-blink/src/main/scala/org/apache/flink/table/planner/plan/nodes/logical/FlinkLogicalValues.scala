@@ -79,7 +79,7 @@ object FlinkLogicalValues {
       cluster: RelOptCluster,
       rowType: RelDataType,
       tuples: ImmutableList[ImmutableList[RexLiteral]]): FlinkLogicalValues = {
-    val mq = cluster.getMetadataQuery.asInstanceOf[RelMetadataQuery]
+    val mq = cluster.getMetadataQuery
     val traitSet = cluster.traitSetOf(FlinkConventions.LOGICAL).replaceIfs(
       RelCollationTraitDef.INSTANCE, new Supplier[util.List[RelCollation]]() {
         def get: util.List[RelCollation] = RelMdCollation.values(mq, rowType, tuples)

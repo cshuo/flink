@@ -28,7 +28,7 @@ import org.apache.calcite.rel.convert.ConverterRule
 import org.apache.calcite.rel.core.Calc
 import org.apache.calcite.rel.hint.RelHint
 import org.apache.calcite.rel.logical.LogicalCalc
-import org.apache.calcite.rel.metadata.{RelMdCollation, RelMetadataQuery}
+import org.apache.calcite.rel.metadata.RelMdCollation
 import org.apache.calcite.rel.{RelCollation, RelCollationTraitDef, RelNode}
 import org.apache.calcite.rex.RexProgram
 
@@ -79,7 +79,7 @@ object FlinkLogicalCalc {
       hints: JList[RelHint],
       calcProgram: RexProgram): FlinkLogicalCalc = {
     val cluster = input.getCluster
-    val mq = cluster.getMetadataQuery.asInstanceOf[RelMetadataQuery]
+    val mq = cluster.getMetadataQuery
     val traitSet = cluster.traitSetOf(FlinkConventions.LOGICAL).replaceIfs(
       RelCollationTraitDef.INSTANCE, new Supplier[util.List[RelCollation]]() {
         def get: util.List[RelCollation] = RelMdCollation.calc(mq, input, calcProgram)

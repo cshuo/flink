@@ -77,7 +77,7 @@ object FlinkLogicalSnapshot {
 
   def create(input: RelNode, period: RexNode): FlinkLogicalSnapshot = {
     val cluster = input.getCluster
-    val mq = cluster.getMetadataQuery.asInstanceOf[RelMetadataQuery]
+    val mq = cluster.getMetadataQuery
     val traitSet = cluster.traitSet.replace(Convention.NONE).replaceIfs(
       RelCollationTraitDef.INSTANCE, new Supplier[util.List[RelCollation]]() {
         def get: util.List[RelCollation] = RelMdCollation.snapshot(mq, input)

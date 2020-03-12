@@ -43,7 +43,7 @@ abstract class StreamExecCalcBase(
     inputRel: RelNode,
     calcProgram: RexProgram,
     outputRowType: RelDataType)
-  extends CommonCalc(cluster, traitSet, ImmutableList.of(),inputRel, calcProgram)
+  extends CommonCalc(cluster, traitSet, ImmutableList.of(), inputRel, calcProgram)
   with StreamPhysicalRel
   with StreamExecNode[BaseRow] {
 

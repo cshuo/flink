@@ -57,7 +57,7 @@ public class FlinkRelMetadataQuery extends RelMetadataQuery {
 	 * @param mq metadataQuery which try to reuse
 	 * @return a FlinkRelMetadataQuery instance
 	 */
-	public static <M extends RelMetadataQuery> FlinkRelMetadataQuery reuseOrCreate(M mq) {
+	public static FlinkRelMetadataQuery reuseOrCreate(RelMetadataQuery mq) {
 		if (mq instanceof FlinkRelMetadataQuery) {
 			return (FlinkRelMetadataQuery) mq;
 		} else {
