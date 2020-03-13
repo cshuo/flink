@@ -60,7 +60,7 @@ abstract class LogicalWindowAggregateRule(ruleName: String)
       throw new TableException("Only a single window group function may be used in GROUP BY")
     }
 
-    !groupSets && !agg.indicator && windowExpressions.nonEmpty
+    !groupSets && windowExpressions.nonEmpty
   }
 
   /**
@@ -72,7 +72,7 @@ abstract class LogicalWindowAggregateRule(ruleName: String)
     */
   override def onMatch(call: RelOptRuleCall): Unit = {
     val agg0 = call.rel[LogicalAggregate](0)
-    val project0 = trimHep(agg0.getInput).asInstanceOf[LogicalProject]
+    val project0 = call.rel[LogicalProject](1)
     val project = rewriteWindowCallWithFuncOperands(project0, call.builder())
     val agg = if (project != project0) {
       agg0.copy(agg0.getTraitSet, Collections.singletonList(project))
@@ -107,7 +107,6 @@ abstract class LogicalWindowAggregateRule(ruleName: String)
     // we don't use the builder here because it uses RelMetadataQuery which affects the plan
     val newAgg = LogicalAggregate.create(
       newProject,
-      agg.indicator,
       newGroupSet,
       ImmutableList.of(newGroupSet),
       finalCalls)
@@ -225,11 +224,10 @@ abstract class LogicalWindowAggregateRule(ruleName: String)
   /** Decides if the [[RexNode]] is a call whose return type is
    * a time indicator type. */
   def isTimeAttributeCall(rexNode: RexNode, projects: JList[RexNode]): Boolean = rexNode match {
-    case call: RexCall if FlinkTypeFactory.isTimeIndicatorType(call.getType)
-        && call.getOperands.forall { operand =>
-            operand.isInstanceOf[RexInputRef]
-        } =>
-      true
+    case call: RexCall if FlinkTypeFactory.isTimeIndicatorType(call.getType) =>
+      call.getOperands.forall { operand =>
+        operand.isInstanceOf[RexInputRef]
+      }
     case _ => false
   }
 

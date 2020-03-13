@@ -162,19 +162,4 @@ class ShuffledHashSemiAntiJoinTest extends SemiAntiJoinTestBase {
     super.testNotInWithUncorrelated_SimpleCondition3()
   }
 
-  @Test
-  override def testExistsWithCorrelated_LateralTableInSubQuery(): Unit = {
-    super.testExistsWithCorrelated_LateralTableInSubQuery()
-  }
-
-  @Test
-  override def testInWithUncorrelated_LateralTableInSubQuery(): Unit = {
-    super.testInWithUncorrelated_LateralTableInSubQuery()
-  }
-
-  @Test
-  override def testInWithCorrelated_LateralTableInSubQuery(): Unit = {
-    super.testInWithCorrelated_LateralTableInSubQuery()
-  }
-
 }

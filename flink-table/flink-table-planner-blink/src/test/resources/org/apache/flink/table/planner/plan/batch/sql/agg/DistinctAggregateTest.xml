@@ -193,7 +193,7 @@ LogicalAggregate(group=[{}], EXPR$0=[COUNT(DISTINCT $0)], EXPR$1=[SUM(DISTINCT $
     </Resource>
     <Resource name="planAfter">
       <![CDATA[
-SortAggregate(isMerge=[true], select=[Final_COUNT(count$0) AS EXPR$0, Final_SUM(sum$1) FILTER min$2 AS EXPR$1, Final_MIN(min$2) AS EXPR$2])
+SortAggregate(isMerge=[true], select=[Final_COUNT(count$0) AS EXPR$0, Final_SUM(sum$1) AS EXPR$1, Final_MIN(min$2) AS EXPR$2])
 +- Exchange(distribution=[single])
    +- LocalSortAggregate(select=[Partial_COUNT(a) FILTER $g_1 AS count$0, Partial_SUM(a) FILTER $g_0 AS sum$1, Partial_MIN(EXPR$2) FILTER $g_3 AS min$2])
       +- Calc(select=[a, EXPR$2, AND(=(CASE(=($e, 0:BIGINT), 0:BIGINT, =($e, 1:BIGINT), 1:BIGINT, 3:BIGINT), 0), IS TRUE(CAST($f1))) AS $g_0, =(CASE(=($e, 0:BIGINT), 0:BIGINT, =($e, 1:BIGINT), 1:BIGINT, 3:BIGINT), 1) AS $g_1, =(CASE(=($e, 0:BIGINT), 0:BIGINT, =($e, 1:BIGINT), 1:BIGINT, 3:BIGINT), 3) AS $g_3])
@@ -304,13 +304,13 @@ LogicalAggregate(group=[{0}], EXPR$1=[MAX($1)], EXPR$2=[MAX($1) FILTER $2], EXPR
     </Resource>
     <Resource name="planAfter">
       <![CDATA[
-SortAggregate(isMerge=[true], groupBy=[d], select=[d, Final_MIN(min$0) AS EXPR$1, Final_MIN(min$1) AS EXPR$2, Final_COUNT(count$2) AS EXPR$3, Final_COUNT(count$3) FILTER count$4 AS EXPR$4, Final_COUNT(count$4) AS EXPR$5])
+SortAggregate(isMerge=[true], groupBy=[d], select=[d, Final_MIN(min$0) AS EXPR$1, Final_MIN(min$1) AS EXPR$2, Final_COUNT(count$2) AS EXPR$3, Final_COUNT(count$3) AS EXPR$4, Final_COUNT(count$4) AS EXPR$5])
 +- Sort(orderBy=[d ASC])
    +- Exchange(distribution=[hash[d]])
       +- LocalSortAggregate(groupBy=[d], select=[d, Partial_MIN(EXPR$1) FILTER $g_15 AS min$0, Partial_MIN(EXPR$2) FILTER $g_15 AS min$1, Partial_COUNT(c) FILTER $g_7 AS count$2, Partial_COUNT(c) FILTER $g_3 AS count$3, Partial_COUNT(b) FILTER $g_12 AS count$4])
          +- Calc(select=[d, c, b, EXPR$1, EXPR$2, AND(=(CASE(=($e, 3:BIGINT), 3:BIGINT, =($e, 7:BIGINT), 7:BIGINT, =($e, 12:BIGINT), 12:BIGINT, 15:BIGINT), 3), $f4) AS $g_3, =(CASE(=($e, 3:BIGINT), 3:BIGINT, =($e, 7:BIGINT), 7:BIGINT, =($e, 12:BIGINT), 12:BIGINT, 15:BIGINT), 7) AS $g_7, AND(=(CASE(=($e, 3:BIGINT), 3:BIGINT, =($e, 7:BIGINT), 7:BIGINT, =($e, 12:BIGINT), 12:BIGINT, 15:BIGINT), 12), $f6) AS $g_12, =(CASE(=($e, 3:BIGINT), 3:BIGINT, =($e, 7:BIGINT), 7:BIGINT, =($e, 12:BIGINT), 12:BIGINT, 15:BIGINT), 15) AS $g_15])
             +- Sort(orderBy=[d ASC])
-               +- SortAggregate(isMerge=[false], groupBy=[d, c, $f4, b, $f6, $e], select=[d, c, $f4, b, $f6, $e, MAX(e) AS EXPR$1, MAX(e) FILTER $f2 AS EXPR$2])
+               +- SortAggregate(isMerge=[false], groupBy=[d, c, $f4, b, $f6, $e], select=[d, c, $f4, b, $f6, $e, MAX(e) AS EXPR$1, MAX(e) AS EXPR$2])
                   +- Sort(orderBy=[d ASC, c ASC, $f4 ASC, b ASC, $f6 ASC, $e ASC])
                      +- Exchange(distribution=[hash[d, c, $f4, b, $f6, $e]])
                         +- Expand(projects=[d, e, $f2, c, $f4, b, $f6, $e], projects=[{d, e, $f2, c, $f4, null AS b, null AS $f6, 3 AS $e}, {d, e, $f2, c, null AS $f4, null AS b, null AS $f6, 7 AS $e}, {d, e, $f2, null AS c, null AS $f4, b, $f6, 12 AS $e}, {d, e, $f2, null AS c, null AS $f4, null AS b, null AS $f6, 15 AS $e}])
@@ -387,7 +387,7 @@ LogicalAggregate(group=[{0}], EXPR$1=[COUNT(DISTINCT $1)], EXPR$2=[COUNT(DISTINC
     </Resource>
     <Resource name="planAfter">
       <![CDATA[
-SortAggregate(isMerge=[true], groupBy=[d], select=[d, Final_COUNT(count$0) AS EXPR$1, Final_COUNT(count$1) FILTER min$3 AS EXPR$2, Final_MIN(min$2) AS EXPR$3, Final_MIN(min$3) AS EXPR$4])
+SortAggregate(isMerge=[true], groupBy=[d], select=[d, Final_COUNT(count$0) AS EXPR$1, Final_COUNT(count$1) AS EXPR$2, Final_MIN(min$2) AS EXPR$3, Final_MIN(min$3) AS EXPR$4])
 +- Sort(orderBy=[d ASC])
    +- Exchange(distribution=[hash[d]])
       +- LocalSortAggregate(groupBy=[d], select=[d, Partial_COUNT(c) FILTER $g_1 AS count$0, Partial_COUNT(c) FILTER $g_0 AS count$1, Partial_MIN(EXPR$3) FILTER $g_3 AS min$2, Partial_MIN(EXPR$4) FILTER $g_3 AS min$3])
