@@ -145,7 +145,6 @@ under the License.
 				[INFO] |  +- com.fasterxml.jackson.core:jackson-annotations:jar:2.10.1:compile
 				[INFO] |  +- org.apiguardian:apiguardian-api:jar:1.1.0:compile
 				[INFO] |  +- com.fasterxml.jackson.core:jackson-core:jar:2.10.1:runtime
-				[INFO] |  +- com.fasterxml.jackson.core:jackson-databind:jar:2.10.1:runtime
 				[INFO] |  +- com.jayway.jsonpath:json-path:jar:2.4.0:runtime
 				[INFO] |  |  \- net.minidev:json-smart:jar:2.3:runtime
 				[INFO] |  |     \- net.minidev:accessors-smart:jar:1.2:runtime
@@ -183,6 +182,10 @@ under the License.
 				<exclusion>
 					<groupId>com.esri.geometry</groupId>
 					<artifactId>esri-geometry-api</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>com.fasterxml.jackson.core</groupId>
+					<artifactId>jackson-databind</artifactId>
 				</exclusion>
 				<exclusion>
 					<groupId>com.fasterxml.jackson.dataformat</groupId>

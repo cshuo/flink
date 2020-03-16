@@ -33,6 +33,8 @@ import org.apache.calcite.util.ImmutableBitSet;
  * e.g ColumnInterval, ColumnNullCount.
  */
 public class FlinkRelMetadataQuery extends RelMetadataQuery {
+	// Serves as the handlers prototype of all the FlinkRelMetadataQuery instances.
+	private static final Handlers HANDLERS = new Handlers();
 
 	private FlinkMetadata.ColumnInterval.Handler columnIntervalHandler;
 	private FlinkMetadata.FilteredColumnInterval.Handler filteredColumnInterval;
@@ -69,20 +71,31 @@ public class FlinkRelMetadataQuery extends RelMetadataQuery {
 	 * Creates a FlinkRelMetadataQuery instance.
 	 */
 	private FlinkRelMetadataQuery() {
-		this.columnIntervalHandler =
-				RelMetadataQuery.initialHandler(FlinkMetadata.ColumnInterval.Handler.class);
-		this.filteredColumnInterval =
-				RelMetadataQuery.initialHandler(FlinkMetadata.FilteredColumnInterval.Handler.class);
-		this.columnNullCountHandler =
-				RelMetadataQuery.initialHandler(FlinkMetadata.ColumnNullCount.Handler.class);
-		this.columnOriginNullCountHandler =
-				RelMetadataQuery.initialHandler(FlinkMetadata.ColumnOriginNullCount.Handler.class);
-		this.uniqueGroupsHandler =
-				RelMetadataQuery.initialHandler(FlinkMetadata.UniqueGroups.Handler.class);
-		this.distributionHandler =
-				RelMetadataQuery.initialHandler(FlinkMetadata.FlinkDistribution.Handler.class);
-		this.modifiedMonotonicityHandler =
-				RelMetadataQuery.initialHandler(FlinkMetadata.ModifiedMonotonicity.Handler.class);
+		this.columnIntervalHandler = HANDLERS.columnIntervalHandler;
+		this.filteredColumnInterval = HANDLERS.filteredColumnInterval;
+		this.columnNullCountHandler = HANDLERS.columnNullCountHandler;
+		this.columnOriginNullCountHandler = HANDLERS.columnOriginNullCountHandler;
+		this.uniqueGroupsHandler = HANDLERS.uniqueGroupsHandler;
+		this.distributionHandler = HANDLERS.distributionHandler;
+		this.modifiedMonotonicityHandler = HANDLERS.modifiedMonotonicityHandler;
+	}
+
+	/** Extended handlers. */
+	private static class Handlers {
+		private FlinkMetadata.ColumnInterval.Handler columnIntervalHandler =
+				initialHandler(FlinkMetadata.ColumnInterval.Handler.class);
+		private FlinkMetadata.FilteredColumnInterval.Handler filteredColumnInterval =
+				initialHandler(FlinkMetadata.FilteredColumnInterval.Handler.class);
+		private FlinkMetadata.ColumnNullCount.Handler columnNullCountHandler =
+				initialHandler(FlinkMetadata.ColumnNullCount.Handler.class);
+		private FlinkMetadata.ColumnOriginNullCount.Handler columnOriginNullCountHandler =
+				initialHandler(FlinkMetadata.ColumnOriginNullCount.Handler.class);
+		private FlinkMetadata.UniqueGroups.Handler uniqueGroupsHandler =
+				initialHandler(FlinkMetadata.UniqueGroups.Handler.class);
+		private FlinkMetadata.FlinkDistribution.Handler distributionHandler =
+				initialHandler(FlinkMetadata.FlinkDistribution.Handler.class);
+		private FlinkMetadata.ModifiedMonotonicity.Handler modifiedMonotonicityHandler =
+				initialHandler(FlinkMetadata.ModifiedMonotonicity.Handler.class);
 	}
 
 	/**
