@@ -87,6 +87,43 @@ class JoinTest extends TableTestBase {
   }
 
   @Test
+  def testAggregateJoinTranspose(): Unit = {
+    util.addTableSource[(String, String, String)]("ali_adapay_var4_1_v3", 'member_id, 'obs_date, 'channel_id)
+    util.addTableSource[(String, String, String)]("intermediate_table", 'channel_id, 'mer_cust_id)
+
+    val sql1 =
+      """
+        |select
+        |  channel_id,
+        |  count (mer_cust_id) as channel_mer_cnt
+        |from intermediate_table
+        |group by channel_id
+        |""".stripMargin
+
+    val sql2 =
+      s"""
+         |select
+         |  t.obs_date,
+         |  t.member_id,
+         |  t1.channel_mer_cnt
+         |from ali_adapay_var4_1_v3 t
+         |left join ($sql1) t1 on t.channel_id = t1.channel_id
+         |""".stripMargin
+
+    val sqlQuery =
+      s"""
+         |select
+         |  obs_date,
+         |  member_id,
+         |  sum (channel_mer_cnt) as channel_mer_cnt
+         |from ($sql2)
+         |group by obs_date, member_id
+         |""".stripMargin
+
+    util.verifyPlan(sqlQuery)
+  }
+
+  @Test
   def testLeftJoinWithEqualPk(): Unit = {
     val query1 = "SELECT SUM(a2) AS a2, a1 FROM A GROUP BY a1"
     val query2 = "SELECT SUM(b2) AS b2, b1 FROM B GROUP BY b1"

@@ -64,6 +64,7 @@ class DataStreamLogicalWindowAggregateRule
 
   override private[table] def translateWindowExpression(
       windowExpr: RexCall,
+      windowExprIdx: Int,
       rowType: RelDataType)
     : LogicalWindow = {
 
@@ -75,19 +76,19 @@ class DataStreamLogicalWindowAggregateRule
           "Only constant window intervals with millisecond resolution are supported.")
       }
 
-    def getOperandAsTimeIndicator(call: RexCall, idx: Int): PlannerResolvedFieldReference =
-      call.getOperands.get(idx) match {
-        case v: RexInputRef if FlinkTypeFactory.isTimeIndicatorType(v.getType) =>
-          PlannerResolvedFieldReference(
-            rowType.getFieldList.get(v.getIndex).getName,
-            FlinkTypeFactory.toTypeInfo(v.getType))
-        case _ =>
-          throw new ValidationException("Window can only be defined over a time attribute column.")
+    def getOperandAsTimeIndicator(call: RexNode): PlannerResolvedFieldReference = {
+      if (!FlinkTypeFactory.isTimeIndicatorType(call.getType)) {
+        throw new ValidationException("Window can only be defined over a time attribute column.")
       }
+
+      PlannerResolvedFieldReference(
+        rowType.getFieldList.get(windowExprIdx).getName,
+        FlinkTypeFactory.toTypeInfo(rowType.getFieldList.get(windowExprIdx).getType))
+    }
 
     windowExpr.getOperator match {
       case BasicOperatorTable.TUMBLE =>
-        val time = getOperandAsTimeIndicator(windowExpr, 0)
+        val time = getOperandAsTimeIndicator(windowExpr.getOperands.get(0))
         val interval = getOperandAsLong(windowExpr, 1)
         TumblingGroupWindow(
           WindowReference("w$", Some(time.resultType)),
@@ -96,7 +97,7 @@ class DataStreamLogicalWindowAggregateRule
         )
 
       case BasicOperatorTable.HOP =>
-        val time = getOperandAsTimeIndicator(windowExpr, 0)
+        val time = getOperandAsTimeIndicator(windowExpr.getOperands.get(0))
         val (slide, size) = (getOperandAsLong(windowExpr, 1), getOperandAsLong(windowExpr, 2))
         SlidingGroupWindow(
           WindowReference("w$", Some(time.resultType)),
@@ -106,7 +107,7 @@ class DataStreamLogicalWindowAggregateRule
         )
 
       case BasicOperatorTable.SESSION =>
-        val time = getOperandAsTimeIndicator(windowExpr, 0)
+        val time = getOperandAsTimeIndicator(windowExpr.getOperands.get(0))
         val gap = getOperandAsLong(windowExpr, 1)
         SessionGroupWindow(
           WindowReference("w$", Some(time.resultType)),

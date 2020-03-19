@@ -31,12 +31,10 @@ import org.apache.flink.table.planner.runtime.utils.TimeTestUtil.TimestampAndWat
 import org.apache.flink.table.planner.runtime.utils._
 import org.apache.flink.table.planner.utils.TableConfigUtils.getMillisecondFromConfigDuration
 import org.apache.flink.types.Row
-
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
-
 import java.math.BigDecimal
 import java.util.concurrent.TimeUnit
 
@@ -80,7 +78,10 @@ class WindowAggregateITCase(mode: StateBackendMode)
         |  concat_distinct_agg(name)
         |FROM T1
         |GROUP BY `string`, HOP(rowtime, INTERVAL '0.004' SECOND, INTERVAL '0.005' SECOND)
-      """.stripMargin
+        |HAVING
+        |  SUM(`int`) > 1 AND
+        |    QUARTER(HOP_START(rowtime, INTERVAL '0.004' SECOND, INTERVAL '0.005' SECOND)) = 1
+        |      """.stripMargin
 
     val sink = new TestingAppendSink
     tEnv.sqlQuery(sql).toAppendStream[Row].addSink(sink)

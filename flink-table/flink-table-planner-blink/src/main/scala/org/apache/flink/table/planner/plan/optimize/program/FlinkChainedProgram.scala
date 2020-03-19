@@ -67,6 +67,8 @@ class FlinkChainedProgram[OC <: FlinkOptimizeContext]
             s"optimize result: \n${FlinkRelOptUtil.toString(result)}")
         }
 
+        println(name)
+        println(FlinkRelOptUtil.toString(result))
         result
     }
   }

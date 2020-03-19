@@ -70,7 +70,7 @@ abstract class LogicalWindowAggregateRuleBase(description: String)
   override def onMatch(call: RelOptRuleCall): Unit = {
     val builder = call.builder()
     val agg: LogicalAggregate = call.rel(0)
-    val project: LogicalProject = rewriteProctimeWindows(call.rel(1), builder)
+    val project: LogicalProject = call.rel(1)
 
     val (windowExpr, windowExprIdx) = getWindowExpressions(agg, project).head
 

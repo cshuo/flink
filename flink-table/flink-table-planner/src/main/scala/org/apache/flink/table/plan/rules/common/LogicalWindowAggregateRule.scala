@@ -71,18 +71,10 @@ abstract class LogicalWindowAggregateRule(ruleName: String)
     * that the types are equivalent.
     */
   override def onMatch(call: RelOptRuleCall): Unit = {
-    val agg0 = call.rel[LogicalAggregate](0)
-    val project0 = call.rel[LogicalProject](1)
-    val project = rewriteWindowCallWithFuncOperands(project0, call.builder())
-    val agg = if (project != project0) {
-      agg0.copy(agg0.getTraitSet, Collections.singletonList(project))
-        .asInstanceOf[LogicalAggregate]
-    } else {
-      agg0
-    }
+    val agg = call.rel[LogicalAggregate](0)
+    val project = agg.getInput.asInstanceOf[HepRelVertex].getCurrentRel.asInstanceOf[LogicalProject]
 
     val (windowExpr, windowExprIdx) = getWindowExpressions(agg).head
-    val window = translateWindowExpression(windowExpr, project.getInput.getRowType)
 
     val rexBuilder = call.builder().getRexBuilder
 
@@ -96,6 +88,8 @@ abstract class LogicalWindowAggregateRule(ruleName: String)
       .push(project.getInput)
       .project(project.getChildExps.updated(windowExprIdx, inAggGroupExpression))
       .build()
+
+    val window = translateWindowExpression(windowExpr, windowExprIdx, newProject.getRowType)
 
     // Currently, this rule removes the window from GROUP BY operation which may lead to changes
     // of AggCall's type which brings fails on type checks.
@@ -345,6 +339,7 @@ abstract class LogicalWindowAggregateRule(ruleName: String)
   /** translate the group window expression in to a Flink Table window. */
   private[table] def translateWindowExpression(
       windowExpr: RexCall,
+      windowExprIdex: Int,
       rowType: RelDataType)
     : LogicalWindow
 }

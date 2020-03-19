@@ -211,6 +211,17 @@ class WindowAggregateTest extends TableTestBase {
   }
 
   @Test
+  def testHoppingFunction1(): Unit = {
+    val sql =
+      "SELECT COUNT(*), weightedAvg(c, a) AS wAvg, " +
+        "  HOP_START(pt, INTERVAL '15' MINUTE, INTERVAL '1' HOUR), " +
+        "  HOP_END(pt, INTERVAL '15' MINUTE, INTERVAL '1' HOUR) " +
+        "FROM (select *, proctime() as pt from MyTable) " +
+        "GROUP BY HOP(pt, INTERVAL '15' MINUTE, INTERVAL '1' HOUR)"
+    util.verifyPlan(sql)
+  }
+
+  @Test
   def testHopWindowWithProctime(): Unit = {
     val sql =
       s"""

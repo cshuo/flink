@@ -49,6 +49,7 @@ class DataSetLogicalWindowAggregateRule
 
   override private[table] def translateWindowExpression(
       windowExpr: RexCall,
+      windowExprIdx: Int,
       rowType: RelDataType): LogicalWindow = {
 
     def getOperandAsLong(call: RexCall, idx: Int): Long =
@@ -58,13 +59,10 @@ class DataSetLogicalWindowAggregateRule
       }
 
     def getFieldReference(operand: RexNode): PlannerExpression = {
-      operand match {
-        case ref: RexInputRef =>
-          // resolve field name of window attribute
-          val fieldName = rowType.getFieldList.get(ref.getIndex).getName
-          val fieldType = rowType.getFieldList.get(ref.getIndex).getType
-          PlannerResolvedFieldReference(fieldName, FlinkTypeFactory.toTypeInfo(fieldType))
-      }
+      // resolve field name of window attribute
+      val fieldName = rowType.getFieldList.get(windowExprIdx).getName
+      val fieldType = rowType.getFieldList.get(windowExprIdx).getType
+      PlannerResolvedFieldReference(fieldName, FlinkTypeFactory.toTypeInfo(fieldType))
     }
 
     val timeField = getFieldReference(windowExpr.getOperands.get(0))
