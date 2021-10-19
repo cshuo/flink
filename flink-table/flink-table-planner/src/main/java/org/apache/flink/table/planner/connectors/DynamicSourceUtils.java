@@ -19,6 +19,7 @@
 package org.apache.flink.table.planner.connectors;
 
 import org.apache.flink.annotation.Internal;
+import org.apache.flink.api.common.RuntimeExecutionMode;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.TableConfig;
@@ -34,6 +35,7 @@ import org.apache.flink.table.catalog.ResolvedCatalogTable;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.catalog.WatermarkSpec;
 import org.apache.flink.table.connector.ChangelogMode;
+import org.apache.flink.table.connector.source.BuiltInDynamicTableSource;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource.ScanRuntimeProvider;
@@ -120,6 +122,14 @@ public final class DynamicSourceUtils {
             FlinkStatistic statistic,
             List<RelHint> hints,
             DynamicTableSource tableSource) {
+
+        if (tableSource instanceof BuiltInDynamicTableSource) {
+            ((BuiltInDynamicTableSource) tableSource)
+                    .setRuntimeMode(
+                            isBatchMode
+                                    ? RuntimeExecutionMode.BATCH
+                                    : RuntimeExecutionMode.STREAMING);
+        }
 
         // 1. prepare table source
         prepareDynamicSource(identifier, catalogTable, tableSource, isBatchMode, config);

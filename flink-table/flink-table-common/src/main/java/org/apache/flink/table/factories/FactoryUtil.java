@@ -59,6 +59,7 @@ import java.util.Optional;
 import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -441,6 +442,18 @@ public final class FactoryUtil {
     @SuppressWarnings("unchecked")
     public static <T extends Factory> T discoverFactory(
             ClassLoader classLoader, Class<T> factoryClass, String factoryIdentifier) {
+        return discoverFactory(
+                classLoader,
+                factoryClass,
+                f -> f.factoryIdentifier().equals(factoryIdentifier),
+                "identifier '" + factoryIdentifier + "'");
+    }
+
+    private static <T extends Factory> T discoverFactory(
+            ClassLoader classLoader,
+            Class<T> factoryClass,
+            Predicate<Factory> predicate,
+            String illegalMessage) {
         final List<Factory> factories = discoverFactories(classLoader);
 
         final List<Factory> foundFactories =
@@ -456,17 +469,15 @@ public final class FactoryUtil {
         }
 
         final List<Factory> matchingFactories =
-                foundFactories.stream()
-                        .filter(f -> f.factoryIdentifier().equals(factoryIdentifier))
-                        .collect(Collectors.toList());
+                foundFactories.stream().filter(predicate).collect(Collectors.toList());
 
         if (matchingFactories.isEmpty()) {
             throw new ValidationException(
                     String.format(
-                            "Could not find any factory for identifier '%s' that implements '%s' in the classpath.\n\n"
+                            "Could not find any factory for %s that implements '%s' in the classpath.\n\n"
                                     + "Available factory identifiers are:\n\n"
                                     + "%s",
-                            factoryIdentifier,
+                            illegalMessage,
                             factoryClass.getName(),
                             foundFactories.stream()
                                     .map(Factory::factoryIdentifier)
@@ -477,10 +488,10 @@ public final class FactoryUtil {
         if (matchingFactories.size() > 1) {
             throw new ValidationException(
                     String.format(
-                            "Multiple factories for identifier '%s' that implement '%s' found in the classpath.\n\n"
+                            "Multiple factories for %s that implement '%s' found in the classpath.\n\n"
                                     + "Ambiguous factory classes are:\n\n"
                                     + "%s",
-                            factoryIdentifier,
+                            illegalMessage,
                             factoryClass.getName(),
                             matchingFactories.stream()
                                     .map(f -> f.getClass().getName())
@@ -621,6 +632,12 @@ public final class FactoryUtil {
             Class<T> factoryClass, DynamicTableFactory.Context context) {
         final String connectorOption = context.getCatalogTable().getOptions().get(CONNECTOR.key());
         if (connectorOption == null) {
+            BuiltInDynamicTableFactory builtInFactory =
+                    discoverSingletonTableFactory(
+                            BuiltInDynamicTableFactory.class, context.getClassLoader());
+            if (factoryClass.isAssignableFrom(builtInFactory.getClass())) {
+                return (T) builtInFactory;
+            }
             throw new ValidationException(
                     String.format(
                             "Table options do not contain an option key '%s' for discovering a connector.",
@@ -631,6 +648,12 @@ public final class FactoryUtil {
         } catch (ValidationException e) {
             throw enrichNoMatchingConnectorError(factoryClass, context, connectorOption);
         }
+    }
+
+    /** Discovers the singleton table factory. */
+    static <T extends DynamicTableFactory> T discoverSingletonTableFactory(
+            Class<T> factoryClass, ClassLoader classLoader) {
+        return discoverFactory(classLoader, factoryClass, ignore -> true, "");
     }
 
     private static CatalogFactory getCatalogFactory(CatalogFactory.Context context) {

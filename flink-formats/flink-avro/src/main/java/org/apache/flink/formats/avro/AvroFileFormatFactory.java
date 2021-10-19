@@ -20,14 +20,20 @@ package org.apache.flink.formats.avro;
 
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.api.common.serialization.BulkWriter;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ReadableConfig;
+import org.apache.flink.connector.file.src.FileSourceSplit;
+import org.apache.flink.connector.file.src.reader.BulkFormat;
 import org.apache.flink.core.fs.FSDataOutputStream;
 import org.apache.flink.formats.avro.typeutils.AvroSchemaConverter;
 import org.apache.flink.table.connector.ChangelogMode;
+import org.apache.flink.table.connector.format.BulkDecodingFormat;
 import org.apache.flink.table.connector.format.EncodingFormat;
 import org.apache.flink.table.connector.sink.DynamicTableSink;
+import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.factories.BulkReaderFormatFactory;
 import org.apache.flink.table.factories.BulkWriterFormatFactory;
 import org.apache.flink.table.factories.DynamicTableFactory;
 import org.apache.flink.table.types.DataType;
@@ -49,7 +55,7 @@ import static org.apache.flink.formats.avro.AvroFormatOptions.AVRO_OUTPUT_CODEC;
 
 /** Avro format factory for file system. */
 @Internal
-public class AvroFileFormatFactory implements BulkWriterFormatFactory {
+public class AvroFileFormatFactory implements BulkWriterFormatFactory, BulkReaderFormatFactory {
 
     public static final String IDENTIFIER = "avro";
 
@@ -88,6 +94,53 @@ public class AvroFileFormatFactory implements BulkWriterFormatFactory {
         Set<ConfigOption<?>> options = new HashSet<>();
         options.add(AVRO_OUTPUT_CODEC);
         return options;
+    }
+
+    @Override
+    public BulkDecodingFormat<RowData> createDecodingFormat(
+            DynamicTableFactory.Context context, ReadableConfig formatOptions) {
+        return new BulkDecodingFormat<RowData>() {
+            @Override
+            public BulkFormat<RowData, FileSourceSplit> createRuntimeDecoder(
+                    DynamicTableSource.Context context, DataType physicalDataType) {
+                AvroToRowDataConverters.AvroToRowDataConverter converter =
+                        AvroToRowDataConverters.createRowConverter(
+                                (RowType) physicalDataType.getLogicalType());
+                // TODO support split and partition
+                return new AvroGenericRecordInputFormat<>(
+                        new RowDataConverter(
+                                converter, context.createTypeInformation(physicalDataType)));
+            }
+
+            @Override
+            public ChangelogMode getChangelogMode() {
+                return ChangelogMode.insertOnly();
+            }
+        };
+    }
+
+    private static class RowDataConverter
+            implements AvroGenericRecordInputFormat.GenericRecordConverter<RowData> {
+
+        private final AvroToRowDataConverters.AvroToRowDataConverter converter;
+        private final TypeInformation<RowData> type;
+
+        private RowDataConverter(
+                AvroToRowDataConverters.AvroToRowDataConverter converter,
+                TypeInformation<RowData> type) {
+            this.converter = converter;
+            this.type = type;
+        }
+
+        @Override
+        public RowData convert(GenericRecord record) {
+            return (RowData) converter.convert(record);
+        }
+
+        @Override
+        public TypeInformation<RowData> getProducedType() {
+            return type;
+        }
     }
 
     /**

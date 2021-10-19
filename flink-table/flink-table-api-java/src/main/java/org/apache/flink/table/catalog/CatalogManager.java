@@ -35,6 +35,8 @@ import org.apache.flink.table.catalog.exceptions.TableAlreadyExistException;
 import org.apache.flink.table.catalog.exceptions.TableNotExistException;
 import org.apache.flink.table.delegation.Planner;
 import org.apache.flink.table.expressions.resolver.ExpressionResolver.ExpressionResolverBuilder;
+import org.apache.flink.table.factories.BuiltInDynamicTableFactory;
+import org.apache.flink.table.factories.BuiltInTableFactoryContextImpl;
 import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.StringUtils;
 
@@ -54,6 +56,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.lang.String.format;
+import static org.apache.flink.table.factories.FactoryUtil.CONNECTOR;
 import static org.apache.flink.util.Preconditions.checkArgument;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -84,8 +87,18 @@ public final class CatalogManager {
 
     private final DataTypeFactory typeFactory;
 
+    private final ClassLoader classLoader;
+
+    private final ReadableConfig config;
+
     private CatalogManager(
-            String defaultCatalogName, Catalog defaultCatalog, DataTypeFactory typeFactory) {
+            String defaultCatalogName,
+            Catalog defaultCatalog,
+            DataTypeFactory typeFactory,
+            ClassLoader classLoader,
+            ReadableConfig config) {
+        this.classLoader = classLoader;
+        this.config = config;
         checkArgument(
                 !StringUtils.isNullOrWhitespaceOnly(defaultCatalogName),
                 "Default catalog name cannot be null or empty");
@@ -147,7 +160,9 @@ public final class CatalogManager {
             return new CatalogManager(
                     defaultCatalogName,
                     defaultCatalog,
-                    new DataTypeFactoryImpl(classLoader, config, executionConfig));
+                    new DataTypeFactoryImpl(classLoader, config, executionConfig),
+                    classLoader,
+                    config);
         }
     }
 
@@ -658,7 +673,11 @@ public final class CatalogManager {
             CatalogBaseTable table, ObjectIdentifier objectIdentifier, boolean ignoreIfExists) {
         execute(
                 (catalog, path) ->
-                        catalog.createTable(path, resolveCatalogBaseTable(table), ignoreIfExists),
+                        catalog.createTable(
+                                path,
+                                resolveCatalogBaseTable(
+                                        onCreateBuiltInTable(objectIdentifier, table, false)),
+                                ignoreIfExists),
                 objectIdentifier,
                 false,
                 "CreateTable");
@@ -687,7 +706,9 @@ public final class CatalogManager {
                         }
                         return v;
                     } else {
-                        final CatalogBaseTable resolvedTable = resolveCatalogBaseTable(table);
+                        final CatalogBaseTable resolvedTable =
+                                resolveCatalogBaseTable(
+                                        onCreateBuiltInTable(objectIdentifier, table, true));
                         if (listener.isPresent()) {
                             return listener.get()
                                     .onCreateTemporaryTable(
@@ -730,6 +751,7 @@ public final class CatalogManager {
         if (filter.test(catalogBaseTable)) {
             getTemporaryOperationListener(objectIdentifier)
                     .ifPresent(l -> l.onDropTemporaryTable(objectIdentifier.toObjectPath()));
+            onDropBuiltInTable(objectIdentifier, catalogBaseTable, true);
             temporaryTables.remove(objectIdentifier);
         } else if (!ignoreIfNotExists) {
             throw new ValidationException(
@@ -808,8 +830,12 @@ public final class CatalogManager {
         }
         final Optional<CatalogBaseTable> resultOpt = getUnresolvedTable(objectIdentifier);
         if (resultOpt.isPresent() && filter.test(resultOpt.get())) {
+
             execute(
-                    (catalog, path) -> catalog.dropTable(path, ignoreIfNotExists),
+                    (catalog, path) -> {
+                        onDropBuiltInTable(objectIdentifier, resultOpt.get(), false);
+                        catalog.dropTable(path, ignoreIfNotExists);
+                    },
                     objectIdentifier,
                     ignoreIfNotExists,
                     "DropTable");
@@ -886,5 +912,38 @@ public final class CatalogManager {
         }
         final ResolvedSchema resolvedSchema = view.getUnresolvedSchema().resolve(schemaResolver);
         return new ResolvedCatalogView(view, resolvedSchema);
+    }
+
+    /** Create a {@link CatalogTable} of {@link BuiltInDynamicTableFactory}. */
+    private CatalogBaseTable onCreateBuiltInTable(
+            ObjectIdentifier identifier, CatalogBaseTable table, boolean isTemporary) {
+        return createBuiltInTableContext(identifier, table, isTemporary)
+                .map(
+                        context ->
+                                (CatalogBaseTable)
+                                        BuiltInDynamicTableFactory.discoverFactory(classLoader)
+                                                .onCreateTable(context))
+                .orElse(table);
+    }
+
+    /** Drop a {@link CatalogTable} of {@link BuiltInDynamicTableFactory}. */
+    private void onDropBuiltInTable(
+            ObjectIdentifier identifier, CatalogBaseTable table, boolean isTemporary) {
+        createBuiltInTableContext(identifier, table, isTemporary)
+                .ifPresent(
+                        context ->
+                                BuiltInDynamicTableFactory.discoverFactory(classLoader)
+                                        .onDropTable(context));
+    }
+
+    private Optional<BuiltInDynamicTableFactory.Context> createBuiltInTableContext(
+            ObjectIdentifier identifier, CatalogBaseTable table, boolean isTemporary) {
+        if (table instanceof CatalogTable && !table.getOptions().containsKey(CONNECTOR.key())) {
+            return Optional.of(
+                    new BuiltInTableFactoryContextImpl(
+                            identifier, (CatalogTable) table, config, classLoader, isTemporary));
+        } else {
+            return Optional.empty();
+        }
     }
 }
