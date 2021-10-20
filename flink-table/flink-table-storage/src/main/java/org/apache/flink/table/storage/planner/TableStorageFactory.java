@@ -26,12 +26,15 @@ import org.apache.flink.table.catalog.ObjectIdentifier;
 import org.apache.flink.table.catalog.ResolvedCatalogTable;
 import org.apache.flink.table.connector.sink.DynamicTableSink;
 import org.apache.flink.table.connector.source.DynamicTableSource;
-import org.apache.flink.table.factories.BuiltInDynamicTableFactory;
-import org.apache.flink.table.factories.BuiltInLogTableFactory;
+import org.apache.flink.table.factories.DefaultDynamicTableFactory;
+import org.apache.flink.table.factories.DefaultLogTableFactory;
 import org.apache.flink.table.factories.DynamicTableFactory;
 import org.apache.flink.table.factories.DynamicTableSinkFactory;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
+import org.apache.flink.table.factories.listener.CreateTableListener;
+import org.apache.flink.table.factories.listener.DropTableListener;
+import org.apache.flink.table.factories.listener.TableNotification;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -41,7 +44,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-import static org.apache.flink.table.storage.TableStorageOptions.BUCKET;
 import static org.apache.flink.table.storage.TableStorageOptions.CHANGE_TRACKING;
 import static org.apache.flink.table.storage.TableStorageOptions.FILE_FORMAT;
 import static org.apache.flink.table.storage.TableStorageOptions.FILE_META_FORMAT;
@@ -53,12 +55,16 @@ import static org.apache.flink.table.storage.TableStorageOptions.TABLE_STORAGE_P
 
 /** */
 public class TableStorageFactory
-        implements DynamicTableSourceFactory, DynamicTableSinkFactory, BuiltInDynamicTableFactory {
+        implements DynamicTableSourceFactory,
+                DynamicTableSinkFactory,
+                DefaultDynamicTableFactory,
+                CreateTableListener,
+                DropTableListener {
 
     private Optional<ResolvedCatalogTable> createKafkaTable(DynamicTableFactory.Context context) {
         Map<String, String> tableOptions = context.getCatalogTable().getOptions();
         if (changeTracking(tableOptions)) {
-            Map<String, String> logOptions = BuiltInLogTableFactory.logOptions(tableOptions);
+            Map<String, String> logOptions = DefaultLogTableFactory.logOptions(tableOptions);
             return Optional.of(
                     new ResolvedCatalogTable(
                             context.getCatalogTable().getOrigin().copy(logOptions),
@@ -119,10 +125,10 @@ public class TableStorageFactory
     }
 
     @Override
-    public CatalogTable onCreateTable(BuiltInDynamicTableFactory.Context context) {
-        CatalogTable table = context.getCatalogTable();
+    public Map<String, String> onTableCreation(TableNotification notification) {
+        CatalogTable table = notification.getCatalogTable();
         Map<String, String> newOptions = new HashMap<>(table.getOptions());
-        ((Configuration) context.getConfiguration())
+        ((Configuration) notification.getConfiguration())
                 .toMap()
                 .forEach(
                         (k, v) -> {
@@ -132,29 +138,30 @@ public class TableStorageFactory
                             }
                         });
 
-        CatalogTable newTable = table.copy(newOptions);
-
-        Path path = tablePath(newOptions, context.getObjectIdentifier());
+        Path path = tablePath(newOptions, notification.getObjectIdentifier());
         try {
             path.getFileSystem().mkdirs(path);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
 
-        return changeTracking(newOptions)
-                ? BuiltInDynamicTableFactory.discoverLogFactory(context.getClassLoader())
-                        .onCreateTable(
-                                Integer.parseInt(
-                                        newOptions.getOrDefault(
-                                                BUCKET.key(), BUCKET.defaultValue().toString())),
-                                context.copy(newTable))
-                : newTable;
+        if (changeTracking(newOptions)) {
+            DefaultLogTableFactory logFactory =
+                    DefaultDynamicTableFactory.discoverDefaultLogFactory(
+                            notification.getClassLoader());
+            if (logFactory instanceof CreateTableListener) {
+                return ((CreateTableListener) logFactory)
+                        .onTableCreation(notification.copy(newOptions));
+            }
+        }
+
+        return newOptions;
     }
 
     @Override
-    public void onDropTable(BuiltInDynamicTableFactory.Context context) {
-        Map<String, String> options = context.getCatalogTable().getOptions();
-        Path path = tablePath(options, context.getObjectIdentifier());
+    public void onTableDrop(TableNotification notification) {
+        Map<String, String> options = notification.getCatalogTable().getOptions();
+        Path path = tablePath(options, notification.getObjectIdentifier());
         try {
             path.getFileSystem().delete(path, true);
         } catch (IOException e) {
@@ -162,8 +169,12 @@ public class TableStorageFactory
         }
 
         if (changeTracking(options)) {
-            BuiltInDynamicTableFactory.discoverLogFactory(context.getClassLoader())
-                    .onDropTable(context);
+            DefaultLogTableFactory logFactory =
+                    DefaultDynamicTableFactory.discoverDefaultLogFactory(
+                            notification.getClassLoader());
+            if (logFactory instanceof DropTableListener) {
+                ((DropTableListener) logFactory).onTableDrop(notification);
+            }
         }
     }
 

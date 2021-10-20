@@ -16,14 +16,16 @@
  * limitations under the License.
  */
 
-package org.apache.flink.table.factories;
+package org.apache.flink.table.factories.listener;
 
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.ObjectIdentifier;
 
-/** */
-public class BuiltInTableFactoryContextImpl implements BuiltInDynamicTableFactory.Context {
+import java.util.Map;
+
+/** The implementation of {@link TableNotification}. */
+public class TableNotificationImpl implements TableNotification {
 
     private final ObjectIdentifier identifier;
 
@@ -35,7 +37,7 @@ public class BuiltInTableFactoryContextImpl implements BuiltInDynamicTableFactor
 
     private final boolean isTemporary;
 
-    public BuiltInTableFactoryContextImpl(
+    public TableNotificationImpl(
             ObjectIdentifier identifier,
             CatalogTable table,
             ReadableConfig config,
@@ -74,8 +76,8 @@ public class BuiltInTableFactoryContextImpl implements BuiltInDynamicTableFactor
     }
 
     @Override
-    public BuiltInDynamicTableFactory.Context copy(CatalogTable newTable) {
-        return new BuiltInTableFactoryContextImpl(
-                identifier, newTable, config, classLoader, isTemporary);
+    public TableNotification copy(Map<String, String> newOptions) {
+        CatalogTable newTable = table.copy(newOptions);
+        return new TableNotificationImpl(identifier, newTable, config, classLoader, isTemporary);
     }
 }

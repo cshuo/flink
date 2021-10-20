@@ -632,11 +632,11 @@ public final class FactoryUtil {
             Class<T> factoryClass, DynamicTableFactory.Context context) {
         final String connectorOption = context.getCatalogTable().getOptions().get(CONNECTOR.key());
         if (connectorOption == null) {
-            BuiltInDynamicTableFactory builtInFactory =
-                    discoverSingletonTableFactory(
-                            BuiltInDynamicTableFactory.class, context.getClassLoader());
-            if (factoryClass.isAssignableFrom(builtInFactory.getClass())) {
-                return (T) builtInFactory;
+            DefaultDynamicTableFactory defaultFactory =
+                    discoverUniqueImplTableFactory(
+                            DefaultDynamicTableFactory.class, context.getClassLoader());
+            if (factoryClass.isAssignableFrom(defaultFactory.getClass())) {
+                return (T) defaultFactory;
             }
             throw new ValidationException(
                     String.format(
@@ -650,8 +650,8 @@ public final class FactoryUtil {
         }
     }
 
-    /** Discovers the singleton table factory. */
-    static <T extends DynamicTableFactory> T discoverSingletonTableFactory(
+    /** Discovers the unique implementation if the table factory class. */
+    static <T extends DynamicTableFactory> T discoverUniqueImplTableFactory(
             Class<T> factoryClass, ClassLoader classLoader) {
         return discoverFactory(classLoader, factoryClass, ignore -> true, "");
     }

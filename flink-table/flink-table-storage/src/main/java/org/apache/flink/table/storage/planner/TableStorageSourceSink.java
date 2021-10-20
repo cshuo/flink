@@ -42,7 +42,7 @@ import org.apache.flink.table.types.logical.RowType;
 import java.util.List;
 import java.util.UUID;
 
-import static org.apache.flink.table.storage.TableStorageOptions.BUCKET;
+import static org.apache.flink.table.factories.DefaultDynamicTableFactory.BUCKET;
 import static org.apache.flink.table.storage.TableStorageOptions.FILE_COMPACTION_MAX_SIZE_AMPLIFICATION_PERCENT;
 import static org.apache.flink.table.storage.TableStorageOptions.FILE_COMPACTION_SIZE_RATIO;
 import static org.apache.flink.table.storage.TableStorageOptions.FILE_FORMAT;

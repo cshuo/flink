@@ -16,14 +16,23 @@
  * limitations under the License.
  */
 
-package org.apache.flink.table.connector.source;
+package org.apache.flink.table.factories.listener;
 
 import org.apache.flink.annotation.Internal;
-import org.apache.flink.api.common.RuntimeExecutionMode;
+import org.apache.flink.table.catalog.Catalog;
+import org.apache.flink.table.factories.DefaultDynamicTableFactory;
+import org.apache.flink.table.factories.DefaultLogTableFactory;
 
-/** */
+/**
+ * An object that can receive a notification when a table is dropped. Notification occurs before
+ * {@link Catalog#dropTable} is called.
+ *
+ * <p>Only {@link DefaultDynamicTableFactory} and {@link DefaultLogTableFactory} support
+ * notification.
+ */
 @Internal
-public interface BuiltInDynamicTableSource extends DynamicTableSource {
+public interface DropTableListener {
 
-    void setRuntimeMode(RuntimeExecutionMode mode);
+    /** Notifies the listener that a table drop occurred. */
+    void onTableDrop(TableNotification context);
 }

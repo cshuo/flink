@@ -18,15 +18,14 @@
 
 package org.apache.flink.table.storage;
 
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.connectors.kafka.KafkaTestBaseWithFlink;
-import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
+import org.apache.flink.streaming.connectors.kafka.table.KafkaTableTestBase;
 import org.apache.flink.types.Row;
 
 import org.junit.Before;
+import org.junit.ClassRule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -37,29 +36,24 @@ import static org.apache.flink.table.utils.TableTestMatchers.deepEqualTo;
 import static org.junit.Assert.assertThat;
 
 /** */
-public class TableStorageLogITCase extends KafkaTestBaseWithFlink {
+public class TableStorageLogITCase extends KafkaTableTestBase {
 
-    protected StreamExecutionEnvironment env;
-    protected StreamTableEnvironment tEnv;
+    @ClassRule public static final TemporaryFolder TEMPORARY_FOLDER = new TemporaryFolder();
 
     @Before
     public void before() throws IOException {
-        env = StreamExecutionEnvironment.getExecutionEnvironment();
-        tEnv = StreamTableEnvironment.create(env);
-        env.getConfig().setRestartStrategy(RestartStrategies.noRestart());
-        env.setParallelism(1);
-        String bootstraps = standardProps.getProperty("bootstrap.servers");
         Configuration configuration = tEnv.getConfig().getConfiguration();
         configuration.setString(
-                "table-storage.file.root-path", tempFolder.newFolder().toURI().toString());
-        configuration.setString("table-storage.log.properties.bootstrap.servers", bootstraps);
+                "table-storage.file.root-path", TEMPORARY_FOLDER.newFolder().toURI().toString());
+        configuration.setString(
+                "table-storage.log.properties.bootstrap.servers", getBootstrapServers());
     }
 
     @Test
     public void testWithPrimaryKey() throws Exception {
         // ---------- Produce an event time stream into Kafka -------------------
         final String createTable =
-                "CREATE TABLE kafka (\n"
+                "CREATE TABLE with_pk (\n"
                         + "  `k_user_id` BIGINT,\n"
                         + "  `name` STRING,\n"
                         + "  `k_event_id` BIGINT,\n"
@@ -71,7 +65,7 @@ public class TableStorageLogITCase extends KafkaTestBaseWithFlink {
         tEnv.executeSql(createTable);
 
         String initialValues =
-                "INSERT INTO kafka\n"
+                "INSERT INTO with_pk\n"
                         + "VALUES\n"
                         + " (1, 'name 1', 100, 41, 'payload 1'),\n"
                         + " (2, 'name 2', 101, 42, 'payload 2'),\n"
@@ -80,7 +74,7 @@ public class TableStorageLogITCase extends KafkaTestBaseWithFlink {
 
         // ---------- Consume stream from Kafka -------------------
 
-        final List<Row> result = collectRows(tEnv.sqlQuery("SELECT * FROM kafka"), 3);
+        final List<Row> result = collectRows(tEnv.sqlQuery("SELECT * FROM with_pk"), 3);
 
         final List<Row> expected =
                 Arrays.asList(
@@ -95,7 +89,7 @@ public class TableStorageLogITCase extends KafkaTestBaseWithFlink {
     public void testWithoutPrimaryKey() throws Exception {
         // ---------- Produce an event time stream into Kafka -------------------
         final String createTable =
-                "CREATE TABLE kafka (\n"
+                "CREATE TABLE wo_pk (\n"
                         + "  `k_user_id` BIGINT,\n"
                         + "  `name` STRING,\n"
                         + "  `k_event_id` BIGINT,\n"
@@ -106,7 +100,7 @@ public class TableStorageLogITCase extends KafkaTestBaseWithFlink {
         tEnv.executeSql(createTable);
 
         String initialValues =
-                "INSERT INTO kafka\n"
+                "INSERT INTO wo_pk\n"
                         + "VALUES\n"
                         + " (1, 'name 1', 100, 41, 'payload 1'),\n"
                         + " (2, 'name 2', 101, 42, 'payload 2'),\n"
@@ -115,7 +109,7 @@ public class TableStorageLogITCase extends KafkaTestBaseWithFlink {
 
         // ---------- Consume stream from Kafka -------------------
 
-        final List<Row> result = collectRows(tEnv.sqlQuery("SELECT * FROM kafka"), 3);
+        final List<Row> result = collectRows(tEnv.sqlQuery("SELECT * FROM wo_pk"), 3);
 
         final List<Row> expected =
                 Arrays.asList(

@@ -19,10 +19,10 @@
 package org.apache.flink.table.storage.planner;
 
 import org.apache.flink.api.common.RuntimeExecutionMode;
+import org.apache.flink.configuration.ExecutionOptions;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.table.api.TableException;
 import org.apache.flink.table.connector.ChangelogMode;
-import org.apache.flink.table.connector.source.BuiltInDynamicTableSource;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
 import org.apache.flink.table.connector.source.SourceProvider;
@@ -43,15 +43,13 @@ import java.util.stream.Collectors;
 
 /** */
 public class TableStorageSource extends TableStorageSourceSink
-        implements ScanTableSource, BuiltInDynamicTableSource, SupportsPartitionPushDown {
+        implements ScanTableSource, SupportsPartitionPushDown {
 
     private final DynamicTableFactory.Context context;
 
     @Nullable private final DynamicTableSource kafkaSource;
 
     private List<Map<String, String>> remainingPartitions;
-
-    private RuntimeExecutionMode mode;
 
     public TableStorageSource(
             TableStorageFactory factory,
@@ -66,7 +64,6 @@ public class TableStorageSource extends TableStorageSourceSink
     public DynamicTableSource copy() {
         TableStorageSource source = new TableStorageSource(factory, context, kafkaSource);
         source.remainingPartitions = remainingPartitions;
-        source.mode = mode;
         return source;
     }
 
@@ -77,14 +74,14 @@ public class TableStorageSource extends TableStorageSourceSink
 
     @Override
     public ChangelogMode getChangelogMode() {
-        return mode == RuntimeExecutionMode.STREAMING
+        return runtimeExecutionMode() == RuntimeExecutionMode.STREAMING
                 ? ChangelogMode.all()
                 : ChangelogMode.insertOnly();
     }
 
     @Override
     public ScanRuntimeProvider getScanRuntimeProvider(ScanContext sourceContext) {
-        if (mode == RuntimeExecutionMode.STREAMING) {
+        if (runtimeExecutionMode() == RuntimeExecutionMode.STREAMING) {
             if (kafkaSource == null) {
                 throw new TableException("kafkaSource is null in streaming mode!");
             }
@@ -141,8 +138,7 @@ public class TableStorageSource extends TableStorageSourceSink
                 .collect(Collectors.toList());
     }
 
-    @Override
-    public void setRuntimeMode(RuntimeExecutionMode mode) {
-        this.mode = mode;
+    private RuntimeExecutionMode runtimeExecutionMode() {
+        return context.getConfiguration().get(ExecutionOptions.RUNTIME_MODE);
     }
 }

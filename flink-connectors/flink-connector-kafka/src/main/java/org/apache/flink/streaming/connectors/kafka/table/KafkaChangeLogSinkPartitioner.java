@@ -25,7 +25,7 @@ import org.apache.flink.types.RowKind;
 import org.apache.flink.util.Preconditions;
 
 /** */
-public class BuiltInTableSinkPartitioner extends FlinkKafkaPartitioner<RowData> {
+public class KafkaChangeLogSinkPartitioner extends FlinkKafkaPartitioner<RowData> {
 
     @Override
     public int partition(

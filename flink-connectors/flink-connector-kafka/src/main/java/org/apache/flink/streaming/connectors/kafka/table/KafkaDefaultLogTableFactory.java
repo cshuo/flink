@@ -26,8 +26,10 @@ import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.api.TableException;
 import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.ObjectIdentifier;
-import org.apache.flink.table.factories.BuiltInDynamicTableFactory;
-import org.apache.flink.table.factories.BuiltInLogTableFactory;
+import org.apache.flink.table.factories.DefaultLogTableFactory;
+import org.apache.flink.table.factories.listener.CreateTableListener;
+import org.apache.flink.table.factories.listener.DropTableListener;
+import org.apache.flink.table.factories.listener.TableNotification;
 import org.apache.flink.util.TimeUtils;
 
 import org.apache.kafka.clients.admin.AdminClient;
@@ -51,29 +53,34 @@ import static org.apache.flink.streaming.connectors.kafka.table.KafkaConnectorOp
 import static org.apache.flink.streaming.connectors.kafka.table.KafkaConnectorOptions.TOPIC;
 import static org.apache.flink.streaming.connectors.kafka.table.KafkaConnectorOptions.TRANSACTIONAL_ID_PREFIX;
 import static org.apache.flink.streaming.connectors.kafka.table.KafkaConnectorOptions.VALUE_FORMAT;
+import static org.apache.flink.table.factories.DefaultDynamicTableFactory.BUCKET;
 import static org.apache.flink.table.factories.FactoryUtil.CONNECTOR;
 import static org.apache.flink.table.factories.FactoryUtil.FORMAT;
 
-/** */
-public class KafkaBuiltInLogFactory implements BuiltInLogTableFactory {
+/** The Kafka {@link DefaultLogTableFactory} implementation. */
+public class KafkaDefaultLogTableFactory
+        implements DefaultLogTableFactory, CreateTableListener, DropTableListener {
 
     public static final ConfigOption<Duration> RETENTION =
             ConfigOptions.key("retention").durationType().noDefaultValue().withDescription("");
 
     @Override
-    public CatalogTable onCreateTable(int bucket, BuiltInDynamicTableFactory.Context context) {
+    public Map<String, String> onTableCreation(TableNotification context) {
         CatalogTable table = context.getCatalogTable();
         Map<String, String> tableOptions = table.getOptions();
         Optional<Schema.UnresolvedPrimaryKey> primaryKey =
                 table.getUnresolvedSchema().getPrimaryKey();
 
         // 1. create topic
-        Map<String, String> logOptions = BuiltInLogTableFactory.logOptions(tableOptions);
+        Map<String, String> logOptions = DefaultLogTableFactory.logOptions(tableOptions);
         String topic = topic(context.getObjectIdentifier());
         Duration retention =
                 Optional.ofNullable(logOptions.get(RETENTION.key()))
                         .map(TimeUtils::parseDuration)
                         .orElse(null);
+        int bucket =
+                Integer.parseInt(
+                        tableOptions.getOrDefault(BUCKET.key(), BUCKET.defaultValue().toString()));
         createTopic(logOptions, topic, bucket, retention, primaryKey.isPresent());
 
         // 2. create new table options
@@ -93,7 +100,8 @@ public class KafkaBuiltInLogFactory implements BuiltInLogTableFactory {
             setIfAbsent(newOptions, TRANSACTIONAL_ID_PREFIX, "kafka-sink");
 
             // partition for changes
-            setIfAbsent(newOptions, SINK_PARTITIONER, BuiltInTableSinkPartitioner.class.getName());
+            setIfAbsent(
+                    newOptions, SINK_PARTITIONER, KafkaChangeLogSinkPartitioner.class.getName());
 
             setIfAbsent(newOptions, SCAN_STARTUP_MODE, ScanStartupMode.EARLIEST_OFFSET.toString());
 
@@ -102,21 +110,21 @@ public class KafkaBuiltInLogFactory implements BuiltInLogTableFactory {
 
         setIfAbsent(newOptions, TOPIC, topic);
 
-        return table.copy(newOptions);
-    }
-
-    private void setIfAbsent(Map<String, String> options, ConfigOption<?> option, String value) {
-        String key = LOG_PREFFIX + option.key();
-        if (!options.containsKey(key)) {
-            options.put(key, value);
-        }
+        return newOptions;
     }
 
     @Override
-    public void onDropTable(BuiltInDynamicTableFactory.Context context) {
+    public void onTableDrop(TableNotification context) {
         Map<String, String> logOptions =
-                BuiltInLogTableFactory.logOptions(context.getCatalogTable().getOptions());
+                DefaultLogTableFactory.logOptions(context.getCatalogTable().getOptions());
         deleteTopic(logOptions, topic(context.getObjectIdentifier()));
+    }
+
+    private void setIfAbsent(Map<String, String> options, ConfigOption<?> option, String value) {
+        String key = LOG_PREFIX + option.key();
+        if (!options.containsKey(key)) {
+            options.put(key, value);
+        }
     }
 
     private static String topic(ObjectIdentifier identifier) {

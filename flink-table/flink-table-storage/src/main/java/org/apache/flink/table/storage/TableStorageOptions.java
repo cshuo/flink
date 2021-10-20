@@ -29,9 +29,6 @@ public class TableStorageOptions {
 
     public static final String TABLE_STORAGE_PREFIX = "table-storage.";
 
-    public static final ConfigOption<Integer> BUCKET =
-            ConfigOptions.key("bucket").intType().defaultValue(1).withDescription("");
-
     public static final ConfigOption<Boolean> CHANGE_TRACKING =
             ConfigOptions.key("change-tracking")
                     .booleanType()

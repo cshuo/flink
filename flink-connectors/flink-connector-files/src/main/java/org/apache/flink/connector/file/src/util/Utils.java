@@ -20,7 +20,6 @@ package org.apache.flink.connector.file.src.util;
 
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.connector.file.src.reader.BulkFormat;
-import org.apache.flink.util.CloseableIterator;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.IOUtils;
 import org.apache.flink.util.function.SupplierWithException;
@@ -28,7 +27,6 @@ import org.apache.flink.util.function.ThrowingRunnable;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.function.Consumer;
 
 /** Miscellaneous utilities for the file source. */
@@ -89,50 +87,6 @@ public final class Utils {
         } finally {
             reader.close();
         }
-    }
-
-    /** Wrap {@link BulkFormat.Reader} to a {@link CloseableIterator}. */
-    public static <T> CloseableIterator<T> wrapIterator(final BulkFormat.Reader<T> reader)
-            throws IOException {
-
-        return new CloseableIterator<T>() {
-
-            private BulkFormat.RecordIterator<T> batchIterator = reader.readBatch();
-
-            private RecordAndPosition<T> record =
-                    batchIterator == null ? null : batchIterator.next();
-
-            @Override
-            public boolean hasNext() {
-                return record != null;
-            }
-
-            @Override
-            public T next() {
-                // remember return record
-                T t = record.record;
-
-                // advance to next record
-                while ((record = batchIterator.next()) == null) {
-                    batchIterator.releaseBatch();
-                    try {
-                        batchIterator = reader.readBatch();
-                    } catch (IOException e) {
-                        throw new UncheckedIOException(e);
-                    }
-
-                    if (batchIterator == null) {
-                        break;
-                    }
-                }
-                return t;
-            }
-
-            @Override
-            public void close() throws Exception {
-                reader.close();
-            }
-        };
     }
 
     // ------------------------------------------------------------------------

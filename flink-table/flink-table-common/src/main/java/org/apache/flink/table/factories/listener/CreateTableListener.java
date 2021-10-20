@@ -16,37 +16,29 @@
  * limitations under the License.
  */
 
-package org.apache.flink.table.factories;
+package org.apache.flink.table.factories.listener;
 
 import org.apache.flink.annotation.Internal;
-import org.apache.flink.table.catalog.CatalogTable;
+import org.apache.flink.table.catalog.Catalog;
+import org.apache.flink.table.factories.DefaultDynamicTableFactory;
+import org.apache.flink.table.factories.DefaultLogTableFactory;
 
-import java.util.HashMap;
 import java.util.Map;
 
-/** */
+/**
+ * An object that can receive a notification when a table is created. Notification occurs before
+ * {@link Catalog#createTable} is called.
+ *
+ * <p>Only {@link DefaultDynamicTableFactory} and {@link DefaultLogTableFactory} support
+ * notification.
+ */
 @Internal
-public interface BuiltInLogTableFactory extends DynamicTableFactory {
+public interface CreateTableListener {
 
-    String LOG_PREFFIX = "log.";
-
-    @Override
-    default String factoryIdentifier() {
-        return "_built-in";
-    }
-
-    CatalogTable onCreateTable(int bucket, BuiltInDynamicTableFactory.Context context);
-
-    void onDropTable(BuiltInDynamicTableFactory.Context context);
-
-    static Map<String, String> logOptions(Map<String, String> tableOptions) {
-        Map<String, String> options = new HashMap<>();
-        tableOptions.forEach(
-                (k, v) -> {
-                    if (k.startsWith(LOG_PREFFIX)) {
-                        options.put(k.substring(LOG_PREFFIX.length()), v);
-                    }
-                });
-        return options;
-    }
+    /**
+     * Notifies the listener that a table creation occurred.
+     *
+     * @return new options of this table.
+     */
+    Map<String, String> onTableCreation(TableNotification context);
 }
