@@ -30,8 +30,4 @@ public interface MemTable {
     LsmIterator iterator();
 
     void clear();
-
-    StoreKey minKey();
-
-    StoreKey maxKey();
 }

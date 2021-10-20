@@ -18,6 +18,7 @@
 
 package org.apache.flink.table.factories.listener;
 
+import org.apache.flink.annotation.Internal;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.ObjectIdentifier;
@@ -25,6 +26,7 @@ import org.apache.flink.table.catalog.ObjectIdentifier;
 import java.util.Map;
 
 /** The implementation of {@link TableNotification}. */
+@Internal
 public class TableNotificationImpl implements TableNotification {
 
     private final ObjectIdentifier identifier;

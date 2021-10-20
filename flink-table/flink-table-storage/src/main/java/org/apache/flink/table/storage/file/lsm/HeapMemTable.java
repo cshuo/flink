@@ -89,14 +89,4 @@ public class HeapMemTable implements MemTable {
     public void clear() {
         table.clear();
     }
-
-    @Override
-    public StoreKey minKey() {
-        return table.firstKey();
-    }
-
-    @Override
-    public StoreKey maxKey() {
-        return table.lastKey();
-    }
 }
