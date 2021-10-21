@@ -35,6 +35,7 @@ import org.apache.flink.table.storage.file.utils.AdvanceIterator;
 import org.apache.flink.table.storage.file.utils.DualIterator;
 import org.apache.flink.table.storage.file.utils.FileFactory;
 import org.apache.flink.table.storage.file.utils.SortMergeIterator;
+import org.apache.flink.table.types.logical.RowType;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -69,6 +70,8 @@ public class FileStoreImpl implements FileStore {
             Path storeDir,
             int keyArity,
             int valueArity,
+            RowType keyType,
+            RowType valueType,
             TypeSerializer<RowData> keySerializer,
             TypeSerializer<RowData> valueSerializer,
             Comparator<RowData> keyComparator,
@@ -86,7 +89,11 @@ public class FileStoreImpl implements FileStore {
         this.keyComparator = keyComparator;
         this.writerFactory = writerFactory;
         this.readerFactory = readerFactory;
-        this.memTable = new HeapMemTable(keyComparator);
+        if (options.binaryEnabled) {
+            this.memTable = new BinaryMemTable(keyType, valueType, options.maxMemBytes);
+        } else {
+            this.memTable = new HeapMemTable(keyComparator, options.maxMemRecords);
+        }
         this.mergePolicy = mergePolicy;
         this.nameFactory =
                 new FileFactory(storeDir, "sst", UUID.randomUUID().toString(), fileExtension);
@@ -100,23 +107,29 @@ public class FileStoreImpl implements FileStore {
 
     @Override
     public void put(RowData key, RowData value) throws StoreException {
-        memTable.put(levels.newSequenceNumber(), ValueKind.ADD, key, value);
-        checkFlush();
+        try {
+            memTable.put(levels.newSequenceNumber(), ValueKind.ADD, key, value);
+        } catch (StoreException e) {
+            doFlush();
+            put(key, value);
+        }
     }
 
     @Override
     public void delete(RowData key, RowData value) throws StoreException {
-        memTable.put(levels.newSequenceNumber(), ValueKind.DELETE, key, value);
-        checkFlush();
+        try {
+            memTable.put(levels.newSequenceNumber(), ValueKind.DELETE, key, value);
+        } catch (StoreException e) {
+            doFlush();
+            delete(key, value);
+        }
     }
 
-    private void checkFlush() {
-        if (memTable.size() > options.maxMemRecords) {
-            try {
-                flush();
-            } catch (IOException e) {
-                throw new StoreException(e);
-            }
+    private void doFlush() {
+        try {
+            flush();
+        } catch (IOException e) {
+            throw new StoreException(e);
         }
     }
 

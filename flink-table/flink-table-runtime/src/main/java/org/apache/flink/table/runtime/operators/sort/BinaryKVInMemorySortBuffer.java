@@ -65,8 +65,7 @@ public class BinaryKVInMemorySortBuffer extends BinaryIndexedSortable {
             BinaryRowDataSerializer valueSerializer,
             RecordComparator comparator,
             ArrayList<MemorySegment> recordBufferSegments,
-            MemorySegmentPool memorySegmentPool)
-            throws IOException {
+            MemorySegmentPool memorySegmentPool) {
         super(
                 normalizedKeyComputer,
                 keySerializer,
@@ -159,7 +158,7 @@ public class BinaryKVInMemorySortBuffer extends BinaryIndexedSortable {
             BinaryRowData reuseKey, BinaryRowData reuseValue, long pointer) throws IOException {
         this.recordBuffer.setReadPosition(pointer);
         reuseKey = this.serializer.mapFromPages(reuseKey, this.recordBuffer);
-        reuseValue = this.serializer.mapFromPages(reuseValue, this.recordBuffer);
+        reuseValue = this.valueSerializer.mapFromPages(reuseValue, this.recordBuffer);
         return Tuple2.of(reuseKey, reuseValue);
     }
 }

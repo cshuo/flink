@@ -22,6 +22,7 @@ import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.configuration.MemorySize;
 
+import static org.apache.flink.configuration.ConfigOptions.key;
 import static org.apache.flink.table.factories.FactoryUtil.FORMAT_SUFFIX;
 
 /** */
@@ -93,5 +94,16 @@ public class TableStorageOptions {
             ConfigOptions.key("file.compaction.size-ratio")
                     .intType()
                     .defaultValue(1)
+                    .withDescription("");
+
+    public static final ConfigOption<Boolean> FILE_BINARY_MEM_TABLE_ENABLED =
+            ConfigOptions.key("mem-table.binary-enabled")
+                    .booleanType()
+                    .defaultValue(true)
+                    .withDescription("");
+    public static final ConfigOption<MemorySize> TABLE_EXEC_RESOURCE_EXTERNAL_BUFFER_MEMORY =
+            key("mem-table.memory")
+                    .memoryType()
+                    .defaultValue(MemorySize.parse("32 mb"))
                     .withDescription("");
 }

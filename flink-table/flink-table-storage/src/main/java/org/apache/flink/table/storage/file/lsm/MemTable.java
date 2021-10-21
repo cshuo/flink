@@ -24,7 +24,7 @@ import org.apache.flink.table.storage.file.utils.DualIterator;
 /** */
 public interface MemTable {
 
-    void put(long sequenceNusmber, ValueKind valueType, RowData key, RowData value);
+    void put(long sequenceNumber, ValueKind valueType, RowData key, RowData value);
 
     int size();
 

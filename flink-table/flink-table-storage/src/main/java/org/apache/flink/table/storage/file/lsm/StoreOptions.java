@@ -29,9 +29,13 @@ public class StoreOptions implements Serializable {
     public final long minFileSize;
     public final int maxSizeAmplificationPercent;
     public final int sizeRatio;
+    public final boolean binaryEnabled;
 
-    // TODO replace maxMemRecords with maxMemBytes
+    // default maxMemRecords
     public final int maxMemRecords = 10_000;
+
+    // default mem size 32M
+    public final long maxMemBytes = 32_000_000L;
 
     public StoreOptions(
             int numFilesLevel0,
@@ -39,12 +43,14 @@ public class StoreOptions implements Serializable {
             long targetFileSize,
             long minFileSize,
             int maxSizeAmplificationPercent,
-            int sizeRatio) {
+            int sizeRatio,
+            boolean binaryEnabled) {
         this.numFilesLevel0 = numFilesLevel0;
         this.numLevels = numLevels;
         this.targetFileSize = targetFileSize;
         this.minFileSize = minFileSize;
         this.maxSizeAmplificationPercent = maxSizeAmplificationPercent;
         this.sizeRatio = sizeRatio;
+        this.binaryEnabled = binaryEnabled;
     }
 }

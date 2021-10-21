@@ -30,13 +30,18 @@ import java.util.TreeMap;
 public class HeapMemTable implements MemTable {
 
     private final TreeMap<StoreKey, RowData> table;
+    private final int maxMemRecords;
 
-    public HeapMemTable(Comparator<RowData> comparator) {
+    public HeapMemTable(Comparator<RowData> comparator, int maxMemRecords) {
         table = new TreeMap<>(new StoreKeyComparator(comparator));
+        this.maxMemRecords = maxMemRecords;
     }
 
     @Override
     public void put(long sequenceNumber, ValueKind valueType, RowData key, RowData value) {
+        if (table.size() > maxMemRecords) {
+            throw new StoreException("MemTable is full, cannot add any more records.");
+        }
         table.put(new StoreKey(key, sequenceNumber, valueType), value);
     }
 

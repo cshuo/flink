@@ -28,6 +28,7 @@ import org.apache.flink.table.storage.file.lsm.StoreOptions;
 import org.apache.flink.table.storage.file.lsm.merge.MergePolicy;
 import org.apache.flink.table.storage.file.lsm.sst.SstFileMeta;
 import org.apache.flink.table.storage.file.utils.FileFactory;
+import org.apache.flink.table.types.logical.RowType;
 
 import java.util.List;
 
@@ -37,6 +38,8 @@ public class FileStoreFactory implements FileStore.Factory {
     private final StoreOptions options;
     private final GeneratedRecordComparator keyComparator;
     private final Path tablePath;
+    private final RowType keyType;
+    private final RowType valueType;
     private final RowDataSerializer keySerializer;
     private final RowDataSerializer valueSerializer;
     private final MergePolicy mergePolicy;
@@ -47,6 +50,8 @@ public class FileStoreFactory implements FileStore.Factory {
             StoreOptions options,
             GeneratedRecordComparator keyComparator,
             Path tablePath,
+            RowType keyType,
+            RowType valueType,
             RowDataSerializer keySerializer,
             RowDataSerializer valueSerializer,
             MergePolicy mergePolicy,
@@ -56,6 +61,8 @@ public class FileStoreFactory implements FileStore.Factory {
         this.mergePolicy = mergePolicy;
         this.keyComparator = keyComparator;
         this.tablePath = tablePath;
+        this.keyType = keyType;
+        this.valueType = valueType;
         this.keySerializer = keySerializer;
         this.valueSerializer = valueSerializer;
         this.formats = formats;
@@ -71,6 +78,8 @@ public class FileStoreFactory implements FileStore.Factory {
                 new Path(tablePath, FileFactory.BUCKET_DIR_PREFIX + bucket),
                 keySerializer.getArity(),
                 valueSerializer.getArity(),
+                keyType,
+                valueType,
                 keySerializer,
                 valueSerializer,
                 comparator,

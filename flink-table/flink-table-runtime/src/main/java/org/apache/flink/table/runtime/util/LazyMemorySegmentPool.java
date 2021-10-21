@@ -19,9 +19,15 @@
 package org.apache.flink.table.runtime.util;
 
 import org.apache.flink.core.memory.MemorySegment;
+import org.apache.flink.core.memory.MemorySegmentFactory;
 import org.apache.flink.runtime.memory.MemoryAllocationException;
 import org.apache.flink.runtime.memory.MemoryManager;
 import org.apache.flink.util.Preconditions;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.annotation.Nullable;
 
 import java.io.Closeable;
 import java.util.ArrayList;
@@ -31,29 +37,41 @@ import java.util.List;
 /** {@link MemorySegmentPool} that lazy allocate memory pages from {@link MemoryManager}. */
 public class LazyMemorySegmentPool implements MemorySegmentPool, Closeable {
 
+    private static final Logger LOG = LoggerFactory.getLogger(LazyMemorySegmentPool.class);
     private static final long PER_REQUEST_MEMORY_SIZE = 16 * 1024 * 1024;
 
     private final Object owner;
-    private final MemoryManager memoryManager;
+    private final @Nullable MemoryManager memoryManager;
     private final ArrayList<MemorySegment> cachePages;
     private final int maxPages;
     private final int perRequestPages;
 
     private int pageUsage;
 
+    public LazyMemorySegmentPool(Object owner, MemoryManager memoryManager, long memorySize) {
+        this(
+                owner,
+                memoryManager,
+                (int) memorySize
+                        / (memoryManager == null
+                                ? MemoryManager.DEFAULT_PAGE_SIZE
+                                : memoryManager.getPageSize()));
+    }
+
     public LazyMemorySegmentPool(Object owner, MemoryManager memoryManager, int maxPages) {
         this.owner = owner;
         this.memoryManager = memoryManager;
         this.cachePages = new ArrayList<>();
-        this.maxPages = maxPages;
         this.pageUsage = 0;
-        this.perRequestPages =
-                Math.max(1, (int) (PER_REQUEST_MEMORY_SIZE / memoryManager.getPageSize()));
+        this.maxPages = maxPages;
+        this.perRequestPages = Math.max(1, (int) (PER_REQUEST_MEMORY_SIZE / pageSize()));
     }
 
     @Override
     public int pageSize() {
-        return this.memoryManager.getPageSize();
+        return memoryManager == null
+                ? MemoryManager.DEFAULT_PAGE_SIZE
+                : memoryManager.getPageSize();
     }
 
     @Override
@@ -78,10 +96,21 @@ public class LazyMemorySegmentPool implements MemorySegmentPool, Closeable {
 
         if (this.cachePages.isEmpty()) {
             int numPages = Math.min(freePages, this.perRequestPages);
-            try {
-                this.memoryManager.allocatePages(owner, this.cachePages, numPages);
-            } catch (MemoryAllocationException e) {
-                throw new RuntimeException(e);
+            // allocate from non-managed heap memory
+            if (memoryManager == null) {
+                for (int i = 0; i < numPages; i++) {
+                    cachePages.add(
+                            MemorySegmentFactory.allocateUnpooledSegment(
+                                    MemoryManager.DEFAULT_PAGE_SIZE));
+                }
+                LOG.info("{} allocate unpooled pages: {}", owner, numPages);
+            } else {
+                try {
+                    this.memoryManager.allocatePages(owner, this.cachePages, numPages);
+                    LOG.info("{} allocate pages: {}", owner, numPages);
+                } catch (MemoryAllocationException e) {
+                    throw new RuntimeException(e);
+                }
             }
         }
         this.pageUsage++;
@@ -125,6 +154,13 @@ public class LazyMemorySegmentPool implements MemorySegmentPool, Closeable {
     }
 
     public void cleanCache() {
-        this.memoryManager.release(this.cachePages);
+        int numPages = this.cachePages.size();
+        if (memoryManager == null) {
+            this.cachePages.clear();
+            LOG.info("{} release unpooled pages: {}", owner, numPages);
+        } else {
+            this.memoryManager.release(this.cachePages);
+            LOG.info("{} release pages: {}", owner, numPages);
+        }
     }
 }
