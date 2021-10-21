@@ -19,6 +19,7 @@
 package org.apache.flink.table.storage.file.lsm;
 
 import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.storage.file.utils.DualIterator;
 
 import java.util.Comparator;
 import java.util.Iterator;
@@ -45,39 +46,39 @@ public class HeapMemTable implements MemTable {
     }
 
     @Override
-    public LsmIterator iterator() {
+    public DualIterator<KeyValue> iterator() {
         Iterator<Map.Entry<StoreKey, RowData>> entries = table.entrySet().iterator();
-        return new LsmIterator() {
+        return new DualIterator<KeyValue>() {
 
-            private Map.Entry<StoreKey, RowData> current;
+            private KeyValue previous = new KeyValue();
+            private KeyValue current = new KeyValue();
+
+            private void switchKeyValue() {
+                KeyValue tmp = previous;
+                previous = current;
+                current = tmp;
+            }
 
             @Override
             public boolean advanceNext() {
+                switchKeyValue();
+
                 if (entries.hasNext()) {
-                    current = entries.next();
+                    Map.Entry<StoreKey, RowData> entry = entries.next();
+                    current.replace(entry.getKey(), entry.getValue());
                     return true;
                 }
                 return false;
             }
 
             @Override
-            public long sequenceNumber() {
-                return current.getKey().getsequenceNumber();
+            public KeyValue previous() {
+                return previous;
             }
 
             @Override
-            public ValueKind valueKind() {
-                return current.getKey().getValueKind();
-            }
-
-            @Override
-            public RowData key() {
-                return current.getKey().getUserKey();
-            }
-
-            @Override
-            public RowData value() {
-                return current.getValue();
+            public KeyValue current() {
+                return current;
             }
 
             @Override

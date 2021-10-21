@@ -31,7 +31,10 @@ import org.apache.flink.table.storage.file.lsm.merge.MergePolicy;
 import org.apache.flink.table.storage.file.lsm.sst.SstFileMeta;
 import org.apache.flink.table.storage.file.lsm.sst.SstFileReader;
 import org.apache.flink.table.storage.file.lsm.sst.SstFileWriter;
+import org.apache.flink.table.storage.file.utils.AdvanceIterator;
+import org.apache.flink.table.storage.file.utils.DualIterator;
 import org.apache.flink.table.storage.file.utils.FileFactory;
+import org.apache.flink.table.storage.file.utils.SortMergeIterator;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -58,7 +61,7 @@ public class FileStoreImpl implements FileStore {
     private final FileFactory nameFactory;
     private final MemTable memTable;
     private final MergePolicy mergePolicy;
-    private final FileManager fileManager;
+    private final Levels levels;
     private final CompactStrategy compactStrategy;
 
     public FileStoreImpl(
@@ -87,8 +90,7 @@ public class FileStoreImpl implements FileStore {
         this.mergePolicy = mergePolicy;
         this.nameFactory =
                 new FileFactory(storeDir, "sst", UUID.randomUUID().toString(), fileExtension);
-        this.fileManager =
-                new FileManager(options.numLevels, files, new StoreKeyComparator(keyComparator));
+        this.levels = new Levels(options.numLevels, files, new StoreKeyComparator(keyComparator));
         this.compactStrategy =
                 new UniversalCompaction(
                         options.maxSizeAmplificationPercent,
@@ -98,13 +100,13 @@ public class FileStoreImpl implements FileStore {
 
     @Override
     public void put(RowData key, RowData value) throws StoreException {
-        memTable.put(fileManager.newSequenceNumber(), ValueKind.ADD, key, value);
+        memTable.put(levels.newSequenceNumber(), ValueKind.ADD, key, value);
         checkFlush();
     }
 
     @Override
     public void delete(RowData key, RowData value) throws StoreException {
-        memTable.put(fileManager.newSequenceNumber(), ValueKind.DELETE, key, value);
+        memTable.put(levels.newSequenceNumber(), ValueKind.DELETE, key, value);
         checkFlush();
     }
 
@@ -118,7 +120,8 @@ public class FileStoreImpl implements FileStore {
         }
     }
 
-    private List<SstFileMeta> writeFile(LsmIterator orderedIter, int level) throws IOException {
+    private List<SstFileMeta> writeFile(AdvanceIterator<KeyValue> orderedIter, int level)
+            throws IOException {
         SstFileWriter writer =
                 new SstFileWriter(
                         writerFactory, nameFactory, options.targetFileSize, keySerializer);
@@ -127,13 +130,13 @@ public class FileStoreImpl implements FileStore {
 
     private void flush() throws IOException {
         if (memTable.size() > 0) {
-            try (LsmIterator iterator = memTable.iterator()) {
-                fileManager.addFiles(writeFile(mergePolicy.merge(iterator, keyComparator), 0));
+            try (DualIterator<KeyValue> iterator = memTable.iterator()) {
+                levels.addFiles(writeFile(mergePolicy.merge(iterator, keyComparator), 0));
                 memTable.clear();
             }
         }
 
-        CompactionUnit compactionUnit = compactStrategy.pick(fileManager.levels());
+        CompactionUnit compactionUnit = compactStrategy.pick(levels.levels());
         if (compactionUnit != null) {
             // TODO async compaction
             compact(compactionUnit);
@@ -152,10 +155,10 @@ public class FileStoreImpl implements FileStore {
         }
 
         List<SstFileMeta> compacted = doCompact(unit.outputLevel(), overlapped);
-        fileManager.addFiles(compacted);
-        List<SstFileMeta> uselessFiles = fileManager.deleteFiles(unfoldSections(overlapped));
+        levels.addFiles(compacted);
+        List<SstFileMeta> uselessFiles = levels.deleteFiles(unfoldSections(overlapped));
 
-        fileManager.upgrade(nonOverlapped, unit.outputLevel());
+        levels.upgrade(nonOverlapped, unit.outputLevel());
 
         // delete useless files in this snapshot
         for (SstFileMeta fileMeta : uselessFiles) {
@@ -166,7 +169,7 @@ public class FileStoreImpl implements FileStore {
 
     private List<SstFileMeta> doCompact(int level, List<Overlap.Section> sections)
             throws IOException {
-        try (LsmIterator iterator = iterator(sections)) {
+        try (AdvanceIterator<KeyValue> iterator = sectionsIterator(sections)) {
             return writeFile(iterator, level);
         }
     }
@@ -176,25 +179,26 @@ public class FileStoreImpl implements FileStore {
             throws StoreException {
         try {
             flush();
-            fileManager.snapshot(addFiles, deleteFiles);
+            levels.snapshot(addFiles, deleteFiles);
         } catch (IOException e) {
             throw new StoreException(e);
         }
     }
 
-    private LsmIterator iterator(List<Overlap.Section> sections) throws IOException {
-        List<Supplier<LsmIterator>> suppliers =
+    private AdvanceIterator<KeyValue> sectionsIterator(List<Overlap.Section> sections)
+            throws IOException {
+        List<Supplier<AdvanceIterator<KeyValue>>> suppliers =
                 sections.stream()
-                        .map(s -> (Supplier<LsmIterator>) () -> iterator(s))
+                        .map(s -> (Supplier<AdvanceIterator<KeyValue>>) () -> sectionIterator(s))
                         .collect(Collectors.toList());
         return suppliers.size() == 1 ? suppliers.get(0).get() : new ConcatenatedIterator(suppliers);
     }
 
-    private LsmIterator iterator(Overlap.Section section) {
-        return merge(section.files().stream().map(this::iterator).collect(Collectors.toList()));
+    private AdvanceIterator<KeyValue> sectionIterator(Overlap.Section section) {
+        return merge(section.files().stream().map(this::fileIterator).collect(Collectors.toList()));
     }
 
-    private LsmIterator iterator(SstFileMeta file) {
+    private DualIterator<KeyValue> fileIterator(SstFileMeta file) {
         SstFileReader reader =
                 new SstFileReader(
                         readerFactory, keyArity, valueArity, keySerializer, valueSerializer);
@@ -205,18 +209,23 @@ public class FileStoreImpl implements FileStore {
         }
     }
 
-    private LsmIterator merge(List<LsmIterator> iterators) {
+    private AdvanceIterator<KeyValue> merge(List<DualIterator<KeyValue>> iterators) {
         if (iterators.size() == 1) {
             return iterators.get(0);
         }
 
-        try {
-            return mergePolicy.merge(
-                    new KeySortedIterator(iterators, new StoreKeyComparator(keyComparator)),
-                    keyComparator);
-        } catch (IOException e) {
-            throw new StoreException(e);
-        }
+        return mergePolicy.merge(
+                new SortMergeIterator<>(
+                        iterators,
+                        (o1, o2) -> {
+                            int result = keyComparator.compare(o1.key(), o2.key());
+                            if (result != 0) {
+                                return result;
+                            }
+
+                            return Long.compare(o1.sequenceNumber(), o2.sequenceNumber());
+                        }),
+                keyComparator);
     }
 
     @Override
@@ -226,8 +235,8 @@ public class FileStoreImpl implements FileStore {
                 throw new UnsupportedOperationException();
             }
 
-            Overlap overlap = new Overlap(keyComparator, fileManager.files());
-            return new UserKeyValueIterator(iterator(overlap.sections()));
+            Overlap overlap = new Overlap(keyComparator, levels.files());
+            return new UserKeyValueIterator(sectionsIterator(overlap.sections()));
         } catch (IOException e) {
             throw new StoreException(e);
         }

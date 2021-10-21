@@ -18,7 +18,7 @@
 
 package org.apache.flink.table.storage.file.lsm;
 
-import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.storage.file.utils.AdvanceIterator;
 
 import java.io.IOException;
 import java.util.LinkedList;
@@ -26,20 +26,21 @@ import java.util.List;
 import java.util.function.Supplier;
 
 /** */
-public class ConcatenatedIterator implements LsmIterator {
+public class ConcatenatedIterator implements AdvanceIterator<KeyValue> {
 
-    private final LinkedList<Supplier<LsmIterator>> queue;
+    private final LinkedList<Supplier<AdvanceIterator<KeyValue>>> queue;
 
-    private LsmIterator iterator;
+    private AdvanceIterator<KeyValue> iterator;
 
-    public ConcatenatedIterator(List<Supplier<LsmIterator>> suppliers) throws IOException {
+    public ConcatenatedIterator(List<Supplier<AdvanceIterator<KeyValue>>> suppliers)
+            throws IOException {
         this.queue = new LinkedList<>(suppliers);
         nextIterator();
     }
 
     private void nextIterator() throws IOException {
         close();
-        Supplier<LsmIterator> supplier = queue.poll();
+        Supplier<AdvanceIterator<KeyValue>> supplier = queue.poll();
         this.iterator = supplier == null ? null : supplier.get();
     }
 
@@ -59,23 +60,8 @@ public class ConcatenatedIterator implements LsmIterator {
     }
 
     @Override
-    public long sequenceNumber() {
-        return this.iterator.sequenceNumber();
-    }
-
-    @Override
-    public ValueKind valueKind() {
-        return this.iterator.valueKind();
-    }
-
-    @Override
-    public RowData key() {
-        return this.iterator.key();
-    }
-
-    @Override
-    public RowData value() {
-        return this.iterator.value();
+    public KeyValue current() {
+        return this.iterator.current();
     }
 
     @Override

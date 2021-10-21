@@ -19,52 +19,62 @@
 package org.apache.flink.table.storage.file.lsm.merge;
 
 import org.apache.flink.table.data.RowData;
-import org.apache.flink.table.storage.file.lsm.LsmIterator;
+import org.apache.flink.table.storage.file.lsm.KeyValue;
+import org.apache.flink.table.storage.file.utils.AdvanceIterator;
+import org.apache.flink.table.storage.file.utils.DualIterator;
 
 import java.io.IOException;
 import java.util.Comparator;
 
 /** */
-public class DeduplicateIterator extends AbstractMergeIterator {
+public class DeduplicateIterator implements AdvanceIterator<KeyValue> {
 
+    private final DualIterator<KeyValue> iterator;
     private final Comparator<RowData> comparator;
 
-    private boolean empty = false;
+    private boolean firstAdvanced = false;
+    private boolean alreadyEmpty = false;
 
-    public DeduplicateIterator(LsmIterator iter, Comparator<RowData> comparator) {
-        super(iter);
+    public DeduplicateIterator(DualIterator<KeyValue> iterator, Comparator<RowData> comparator) {
+        this.iterator = iterator;
         this.comparator = comparator;
     }
 
     @Override
     public boolean advanceNext() throws IOException {
-        if (empty) {
+        if (alreadyEmpty) {
             return false;
         }
 
         // Prepare first record candidate
-        if (key == null) {
-            if (!iter.advanceNext()) {
+        if (!firstAdvanced) {
+            firstAdvanced = true;
+            if (!iterator.advanceNext()) {
                 return false;
             }
         }
 
-        // Determine current element
-        assignRecord();
-
         while (true) {
-            if (iter.advanceNext()) {
+            if (iterator.advanceNext()) {
                 // ignore same key
-                if (comparator.compare(iter.key(), key) == 0) {
-                    assignRecord();
-                } else {
+                if (comparator.compare(iterator.current().key(), iterator.previous().key()) != 0) {
                     return true;
                 }
             } else {
-                empty = true;
+                alreadyEmpty = true;
                 // return last record
                 return true;
             }
         }
+    }
+
+    @Override
+    public KeyValue current() {
+        return iterator.previous();
+    }
+
+    @Override
+    public void close() throws IOException {
+        this.iterator.close();
     }
 }

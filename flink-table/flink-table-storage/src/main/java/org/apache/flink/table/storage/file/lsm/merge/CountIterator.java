@@ -20,8 +20,9 @@ package org.apache.flink.table.storage.file.lsm.merge;
 
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
-import org.apache.flink.table.storage.file.lsm.LsmIterator;
-import org.apache.flink.table.storage.file.lsm.ValueKind;
+import org.apache.flink.table.storage.file.lsm.KeyValue;
+import org.apache.flink.table.storage.file.utils.AdvanceIterator;
+import org.apache.flink.table.storage.file.utils.DualIterator;
 
 import java.io.IOException;
 import java.util.Comparator;
@@ -29,43 +30,48 @@ import java.util.Comparator;
 import static org.apache.flink.util.Preconditions.checkArgument;
 
 /** */
-public class CountIterator extends AbstractMergeIterator {
+public class CountIterator implements AdvanceIterator<KeyValue> {
 
+    private final DualIterator<KeyValue> iterator;
     private final Comparator<RowData> comparator;
 
-    private boolean empty = false;
+    private boolean firstAdvanced = false;
+    private boolean alreadyEmpty = false;
 
-    public CountIterator(LsmIterator iter, Comparator<RowData> comparator) {
-        super(iter);
+    private long count;
+
+    public CountIterator(DualIterator<KeyValue> iterator, Comparator<RowData> comparator) {
+        this.iterator = iterator;
         this.comparator = comparator;
     }
 
     @Override
     public boolean advanceNext() throws IOException {
-        if (empty) {
+        if (alreadyEmpty) {
             return false;
         }
 
         // Prepare first record candidate
-        if (key == null) {
-            if (!iter.advanceNext()) {
+        if (!firstAdvanced) {
+            firstAdvanced = true;
+            if (!iterator.advanceNext()) {
                 return false;
             }
         }
 
-        // Determine current element
-        assignRecord();
+        // assign
+        this.count = currentCount();
 
         while (true) {
-            if (iter.advanceNext()) {
+            if (iterator.advanceNext()) {
                 // accumulate same key
-                if (comparator.compare(iter.key(), key) == 0) {
-                    accumulateRecord();
+                if (comparator.compare(iterator.current().key(), iterator.previous().key()) == 0) {
+                    this.count += currentCount();
                 } else {
                     return true;
                 }
             } else {
-                empty = true;
+                alreadyEmpty = true;
                 // return last record if count is not zero
                 return currentCount() != 0;
             }
@@ -73,19 +79,18 @@ public class CountIterator extends AbstractMergeIterator {
     }
 
     @Override
-    protected void assignRecord() {
-        super.assignRecord();
-        checkArgument(valueKind == ValueKind.ADD, "The value should be ADD.");
-    }
-
-    private void accumulateRecord() {
-        long oldCount = currentCount();
-        assignRecord();
-        value = GenericRowData.of(oldCount + currentCount());
+    public KeyValue current() {
+        return iterator.previous().replaceValue(GenericRowData.of(count));
     }
 
     private long currentCount() {
+        RowData value = iterator.current().value();
         checkArgument(!value.isNullAt(0), "The count can not be null.");
         return value.getLong(0);
+    }
+
+    @Override
+    public void close() throws IOException {
+        this.iterator.close();
     }
 }

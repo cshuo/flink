@@ -25,6 +25,9 @@ import org.apache.flink.table.storage.file.manifest.FileKind;
 import org.apache.flink.table.storage.file.manifest.ManifestEntry;
 import org.apache.flink.table.storage.file.manifest.ManifestFileMeta;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -39,6 +42,8 @@ import static org.apache.flink.table.storage.file.utils.FileFactory.SNAPSHOT_DIR
 /** */
 public class SnapshotExpire {
 
+    private static final Logger LOG = LoggerFactory.getLogger(SnapshotExpire.class);
+
     private final DynamicTable table;
 
     public SnapshotExpire(DynamicTable table) {
@@ -50,9 +55,8 @@ public class SnapshotExpire {
         Set<ManifestFileMeta> manifests = new HashSet<>();
         List<Snapshot> snapshots = table.snapshots();
         if (snapshots.size() > maxSnapshots) {
-            System.out.println();
-            System.out.println("--------- start expire! -------------");
-            snapshots.forEach(this::print);
+            LOG.debug("--------- start expire! -------------");
+            debug(snapshots);
             List<Snapshot> expired = new ArrayList<>();
             int earliestLive = snapshots.size() - maxSnapshots;
             for (int i = 0; i < earliestLive; i++) {
@@ -68,15 +72,18 @@ public class SnapshotExpire {
             }
 
             table.reload();
-            System.out.println("--------- end expire! -------------");
-            System.out.println();
+            LOG.debug("--------- end expire! -------------");
         }
     }
 
-    private void print(Snapshot snapshot) {
-        System.out.println();
-        System.out.println("files of " + snapshot.fileName() + ":");
-        System.out.println(table.readSnapshot(snapshot).toIdentifierSet());
+    private void debug(List<Snapshot> snapshots) {
+        if (LOG.isDebugEnabled()) {
+            snapshots.forEach(
+                    snapshot -> {
+                        LOG.debug("files of " + snapshot.fileName() + ":");
+                        LOG.debug(table.readSnapshot(snapshot).toIdentifierSet().toString());
+                    });
+        }
     }
 
     private void expireEarliest(Set<ManifestFileMeta> manifests, Snapshot nextSnapshot)
@@ -97,7 +104,7 @@ public class SnapshotExpire {
         for (ManifestEntry e : dataFiles) {
             if (!liveFiles.contains(e.identifier())) {
                 deleteFile(e);
-                System.out.println("delete file: " + e.identifier());
+                LOG.debug("delete file: {}", e.identifier());
             }
         }
 

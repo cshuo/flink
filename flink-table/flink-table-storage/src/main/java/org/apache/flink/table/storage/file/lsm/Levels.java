@@ -28,13 +28,13 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /** */
-public class FileManager {
+public class Levels {
 
     private final List<Level> levels;
 
     private long newSequenceNumber;
 
-    public FileManager(int numLevels, List<SstFileMeta> fileList, StoreKeyComparator comparator) {
+    public Levels(int numLevels, List<SstFileMeta> fileList, StoreKeyComparator comparator) {
         List<List<SstFileMeta>> levelFiles = new ArrayList<>();
         for (int i = 0; i < numLevels; i++) {
             levelFiles.add(new ArrayList<>());

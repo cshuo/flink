@@ -18,8 +18,13 @@
 
 package org.apache.flink.table.storage;
 
+import org.apache.flink.api.common.RuntimeExecutionMode;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.streaming.api.CheckpointingMode;
+import org.apache.flink.table.api.EnvironmentSettings;
+import org.apache.flink.table.api.TableEnvironment;
+import org.apache.flink.table.api.TableResult;
+import org.apache.flink.table.api.config.ExecutionConfigOptions;
 import org.apache.flink.table.planner.runtime.utils.StreamingTestBase;
 
 import org.junit.Before;
@@ -29,6 +34,10 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+import static org.apache.flink.configuration.ExecutionOptions.RUNTIME_MODE;
 
 /** */
 public class StreamTableStorageITCase extends StreamingTestBase {
@@ -63,7 +72,29 @@ public class StreamTableStorageITCase extends StreamingTestBase {
 
     @Test
     public void write() throws ExecutionException, InterruptedException {
-        tEnv().executeSql("CREATE TABLE t (a INT, b BIGINT, PRIMARY KEY(a) NOT ENFORCED)");
-        tEnv().executeSql("INSERT INTO t SELECT a, b FROM src").await();
+        // run both stream and batch
+        tEnv().getConfig()
+                .getConfiguration()
+                .set(ExecutionConfigOptions.TABLE_EXEC_RESOURCE_DEFAULT_PARALLELISM, 1);
+
+        String ddl = "CREATE TABLE t (a INT, b BIGINT, PRIMARY KEY(a) NOT ENFORCED)";
+        tEnv().executeSql(ddl);
+        TableResult result = tEnv().executeSql("INSERT INTO t SELECT a, b FROM src");
+
+        TableEnvironment batchEnv = TableEnvironment.create(EnvironmentSettings.inBatchMode());
+        batchEnv.getConfig().addConfiguration(tEnv().getConfig().getConfiguration());
+        batchEnv.getConfig().getConfiguration().set(RUNTIME_MODE, RuntimeExecutionMode.BATCH);
+        batchEnv.executeSql(ddl);
+
+        while (true) {
+            try {
+                result.await(10, TimeUnit.SECONDS);
+                break;
+            } catch (TimeoutException ignored) {
+            }
+
+            System.out.println("start new query!");
+            batchEnv.executeSql("SELECT * FROM t").print();
+        }
     }
 }

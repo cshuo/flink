@@ -19,7 +19,9 @@
 package org.apache.flink.table.storage.file.lsm.merge;
 
 import org.apache.flink.table.data.RowData;
-import org.apache.flink.table.storage.file.lsm.LsmIterator;
+import org.apache.flink.table.storage.file.lsm.KeyValue;
+import org.apache.flink.table.storage.file.utils.AdvanceIterator;
+import org.apache.flink.table.storage.file.utils.DualIterator;
 
 import java.io.Serializable;
 import java.util.Comparator;
@@ -29,12 +31,13 @@ public enum MergePolicy implements Serializable {
     COUNT,
     DEDUPLICATE;
 
-    public LsmIterator merge(LsmIterator iter, Comparator<RowData> comparator) {
+    public AdvanceIterator<KeyValue> merge(
+            DualIterator<KeyValue> iterator, Comparator<RowData> comparator) {
         switch (this) {
             case COUNT:
-                return new CountIterator(iter, comparator);
+                return new CountIterator(iterator, comparator);
             case DEDUPLICATE:
-                return new DeduplicateIterator(iter, comparator);
+                return new DeduplicateIterator(iterator, comparator);
             default:
                 throw new UnsupportedOperationException("Unsupported strategy: " + this);
         }

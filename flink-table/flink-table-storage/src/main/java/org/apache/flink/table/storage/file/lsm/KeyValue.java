@@ -16,57 +16,52 @@
  * limitations under the License.
  */
 
-package org.apache.flink.table.storage.file.lsm.merge;
+package org.apache.flink.table.storage.file.lsm;
 
 import org.apache.flink.table.data.RowData;
-import org.apache.flink.table.storage.file.lsm.LsmIterator;
-import org.apache.flink.table.storage.file.lsm.ValueKind;
-
-import java.io.IOException;
 
 /** */
-public abstract class AbstractMergeIterator implements LsmIterator {
+public class KeyValue {
 
-    protected final LsmIterator iter;
+    private RowData key;
+    private long sequenceNumber;
+    private ValueKind valueKind;
+    private RowData value;
 
-    protected RowData key;
-    protected RowData value;
-    protected long sequenceNumber;
-    protected ValueKind valueKind;
-
-    public AbstractMergeIterator(LsmIterator iter) {
-        this.iter = iter;
+    public KeyValue replace(RowData key, long sequenceNumber, ValueKind valueKind, RowData value) {
+        this.key = key;
+        this.sequenceNumber = sequenceNumber;
+        this.valueKind = valueKind;
+        this.value = value;
+        return this;
     }
 
-    protected void assignRecord() {
-        key = iter.key();
-        value = iter.value();
-        sequenceNumber = iter.sequenceNumber();
-        valueKind = iter.valueKind();
+    public KeyValue replace(StoreKey key, RowData value) {
+        this.key = key.getUserKey();
+        this.sequenceNumber = key.getsequenceNumber();
+        this.valueKind = key.getValueKind();
+        this.value = value;
+        return this;
     }
 
-    @Override
-    public long sequenceNumber() {
-        return sequenceNumber;
+    public KeyValue replaceValue(RowData value) {
+        this.value = value;
+        return this;
     }
 
-    @Override
-    public ValueKind valueKind() {
-        return valueKind;
-    }
-
-    @Override
     public RowData key() {
         return key;
     }
 
-    @Override
-    public RowData value() {
-        return value;
+    public long sequenceNumber() {
+        return sequenceNumber;
     }
 
-    @Override
-    public void close() throws IOException {
-        iter.close();
+    public ValueKind valueKind() {
+        return valueKind;
+    }
+
+    public RowData value() {
+        return value;
     }
 }

@@ -16,23 +16,20 @@
  * limitations under the License.
  */
 
-package org.apache.flink.table.storage.file.lsm;
+package org.apache.flink.table.storage.file.utils;
 
-import org.apache.flink.table.data.RowData;
+/**
+ * A {@link AdvanceIterator} to support retrieve previous element. This is useful when underlying
+ * iterator has object reusing, the caller can maintain two elements at the same time.
+ */
+public interface DualIterator<T> extends AdvanceIterator<T> {
 
-import java.io.Closeable;
-import java.io.IOException;
-
-/** */
-public interface LsmIterator extends Closeable {
-
-    boolean advanceNext() throws IOException;
-
-    long sequenceNumber();
-
-    ValueKind valueKind();
-
-    RowData key();
-
-    RowData value();
+    /**
+     * Retrieve previous element from this iterator. This method is idempotent.
+     *
+     * <p>It is illegal to call this method when there is no previous element.
+     *
+     * <p>It is legal after {@link #advanceNext()} has returned false.
+     */
+    T previous();
 }

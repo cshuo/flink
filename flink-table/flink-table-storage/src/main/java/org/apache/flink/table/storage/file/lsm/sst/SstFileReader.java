@@ -25,14 +25,14 @@ import org.apache.flink.connector.file.src.reader.BulkFormat;
 import org.apache.flink.connector.file.src.util.RecordAndPosition;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.table.data.RowData;
-import org.apache.flink.table.storage.file.lsm.KeySortedIterator;
-import org.apache.flink.table.storage.file.lsm.LsmIterator;
+import org.apache.flink.table.storage.file.lsm.KeyValue;
 import org.apache.flink.table.storage.file.lsm.ValueKind;
+import org.apache.flink.table.storage.file.utils.DualIterator;
 import org.apache.flink.table.storage.file.utils.OffsetRowData;
 
 import java.io.IOException;
 
-/** TODO {@link KeySortedIterator} will copy records, we need avoid this. */
+/** */
 public class SstFileReader {
 
     private final Configuration configuration;
@@ -56,29 +56,43 @@ public class SstFileReader {
         this.valueArity = valueArity;
     }
 
-    public LsmIterator read(Path path) throws IOException {
+    public DualIterator<KeyValue> read(Path path) throws IOException {
         FileSourceSplit split =
                 new FileSourceSplit(
                         "DUMMY", path, 0, path.getFileSystem().getFileStatus(path).getLen());
         BulkFormat.Reader<RowData> reader = readerFactory.createReader(configuration, split);
 
-        return new LsmIterator() {
+        return new DualIterator<KeyValue>() {
 
-            private final OffsetRowData key = new OffsetRowData(keyArity, 2);
-            private final OffsetRowData value = new OffsetRowData(valueArity, 2 + keyArity);
+            private KeyValue previous = new KeyValue();
+            private KeyValue current = new KeyValue();
 
             private BulkFormat.RecordIterator<RowData> batchIterator = reader.readBatch();
-            private RowData row;
+
+            private void switchKeyValue() {
+                KeyValue tmp = previous;
+                previous = current;
+                current = tmp;
+            }
 
             @Override
             public boolean advanceNext() throws IOException {
                 if (batchIterator == null) {
+                    switchKeyValue();
                     return false;
                 }
 
                 RecordAndPosition<RowData> record = batchIterator.next();
                 if (record != null) {
-                    row = record.getRecord();
+                    switchKeyValue();
+                    RowData row = record.getRecord();
+                    // TODO avoid copy
+                    current.replace(
+                            keySerializer.copy(new OffsetRowData(keyArity, 0).replace(row)),
+                            row.getLong(keyArity),
+                            ValueKind.fromByteValue(row.getByte(keyArity + 1)),
+                            valueSerializer.copy(
+                                    new OffsetRowData(valueArity, keyArity + 2).replace(row)));
                     return true;
                 } else {
                     batchIterator.releaseBatch();
@@ -88,25 +102,13 @@ public class SstFileReader {
             }
 
             @Override
-            public long sequenceNumber() {
-                return row.getLong(0);
+            public KeyValue previous() {
+                return previous;
             }
 
             @Override
-            public ValueKind valueKind() {
-                return ValueKind.fromByteValue(row.getByte(1));
-            }
-
-            @Override
-            public RowData key() {
-                // TODO remove copy
-                return keySerializer.copy(key.replace(row));
-            }
-
-            @Override
-            public RowData value() {
-                // TODO remove copy
-                return valueSerializer.copy(value.replace(row));
+            public KeyValue current() {
+                return current;
             }
 
             @Override

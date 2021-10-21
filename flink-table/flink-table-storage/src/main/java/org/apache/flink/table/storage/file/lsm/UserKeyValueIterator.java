@@ -19,15 +19,16 @@
 package org.apache.flink.table.storage.file.lsm;
 
 import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.storage.file.utils.AdvanceIterator;
 
 import java.io.IOException;
 
 /** */
 public class UserKeyValueIterator implements KeyValueIterator<RowData, RowData> {
 
-    private final LsmIterator iter;
+    private final AdvanceIterator<KeyValue> iter;
 
-    public UserKeyValueIterator(LsmIterator iter) {
+    public UserKeyValueIterator(AdvanceIterator<KeyValue> iter) {
         this.iter = iter;
     }
 
@@ -38,7 +39,7 @@ public class UserKeyValueIterator implements KeyValueIterator<RowData, RowData> 
                 return false;
             }
 
-            if (iter.valueKind() != ValueKind.DELETE) {
+            if (iter.current().valueKind() != ValueKind.DELETE) {
                 return true;
             }
         }
@@ -46,12 +47,12 @@ public class UserKeyValueIterator implements KeyValueIterator<RowData, RowData> 
 
     @Override
     public RowData getKey() {
-        return iter.key();
+        return iter.current().key();
     }
 
     @Override
     public RowData getValue() {
-        return iter.value();
+        return iter.current().value();
     }
 
     @Override

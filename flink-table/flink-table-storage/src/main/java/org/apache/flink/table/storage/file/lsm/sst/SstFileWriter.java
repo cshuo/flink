@@ -26,8 +26,9 @@ import org.apache.flink.core.fs.Path;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.data.utils.JoinedRowData;
-import org.apache.flink.table.storage.file.lsm.LsmIterator;
+import org.apache.flink.table.storage.file.lsm.KeyValue;
 import org.apache.flink.table.storage.file.lsm.StoreKey;
+import org.apache.flink.table.storage.file.utils.AdvanceIterator;
 import org.apache.flink.table.storage.file.utils.FileFactory;
 import org.apache.flink.table.storage.file.utils.FileUtils;
 import org.apache.flink.table.types.logical.BigIntType;
@@ -58,7 +59,8 @@ public class SstFileWriter {
         this.keySerializer = keySerializer;
     }
 
-    public List<SstFileMeta> write(LsmIterator orderedIter, int level, boolean allowRolling)
+    public List<SstFileMeta> write(
+            AdvanceIterator<KeyValue> orderedIter, int level, boolean allowRolling)
             throws IOException {
         List<SstFileMeta> files = new ArrayList<>();
 
@@ -72,9 +74,9 @@ public class SstFileWriter {
         long minSequenceNumber = Long.MAX_VALUE;
         long maxSequenceNumber = Long.MIN_VALUE;
 
-        GenericRowData header = new GenericRowData(2);
-        JoinedRowData headerWithKey = new JoinedRowData();
-        JoinedRowData outRow = new JoinedRowData();
+        JoinedRowData keyWithMeta = new JoinedRowData();
+        JoinedRowData row = new JoinedRowData();
+        GenericRowData meta = new GenericRowData(2);
 
         while (orderedIter.advanceNext()) {
             if (writer == null || (allowRolling && shouldRollOnEvent(out))) {
@@ -99,18 +101,20 @@ public class SstFileWriter {
                 rowCount = 0;
                 minKey =
                         new StoreKey(
-                                keySerializer.copy(orderedIter.key()),
-                                orderedIter.sequenceNumber(),
-                                orderedIter.valueKind());
+                                keySerializer.copy(orderedIter.current().key()),
+                                orderedIter.current().sequenceNumber(),
+                                orderedIter.current().valueKind());
                 minSequenceNumber = Long.MAX_VALUE;
                 maxSequenceNumber = Long.MIN_VALUE;
             }
 
-            long sequenceNumber = orderedIter.sequenceNumber();
-            header.setField(0, sequenceNumber);
-            header.setField(1, orderedIter.valueKind().toByteValue());
-            outRow.replace(headerWithKey.replace(header, orderedIter.key()), orderedIter.value());
-            writer.addElement(outRow);
+            long sequenceNumber = orderedIter.current().sequenceNumber();
+            meta.setField(0, sequenceNumber);
+            meta.setField(1, orderedIter.current().valueKind().toByteValue());
+            row.replace(
+                    keyWithMeta.replace(orderedIter.current().key(), meta),
+                    orderedIter.current().value());
+            writer.addElement(row);
 
             rowCount++;
 
@@ -124,9 +128,9 @@ public class SstFileWriter {
 
             maxKey =
                     new StoreKey(
-                            keySerializer.copy(orderedIter.key()),
+                            keySerializer.copy(orderedIter.current().key()),
                             sequenceNumber,
-                            orderedIter.valueKind());
+                            orderedIter.current().valueKind());
         }
 
         if (writer != null) {
@@ -154,13 +158,13 @@ public class SstFileWriter {
     }
 
     public static RowType schema(RowType keyType, RowType valueType) {
-        List<RowType.RowField> fields = new ArrayList<>();
+        List<RowType.RowField> fields =
+                new ArrayList<>(
+                        keyType.getFields().stream()
+                                .map(f -> new RowType.RowField("_PK_" + f.getName(), f.getType()))
+                                .collect(Collectors.toList()));
         fields.add(new RowType.RowField("_SEQUENCE_NUMBER", new BigIntType(false)));
         fields.add(new RowType.RowField("_VALUE_KIND", new TinyIntType(false)));
-        fields.addAll(
-                keyType.getFields().stream()
-                        .map(f -> new RowType.RowField("_PK_" + f.getName(), f.getType()))
-                        .collect(Collectors.toList()));
         fields.addAll(valueType.getFields());
         return new RowType(fields);
     }
