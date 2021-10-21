@@ -175,7 +175,8 @@ public final class BinaryInMemorySortBuffer extends BinaryIndexedSortable {
     private BinaryRowData getRecordFromBuffer(BinaryRowData reuse, long pointer)
             throws IOException {
         this.recordBuffer.setReadPosition(pointer);
-        return this.serializer.mapFromPages(reuse, this.recordBuffer);
+        RowData data = inputSerializer.mapFromPages(reuse, this.recordBuffer);
+        return inputSerializer.toBinaryRow(data);
     }
 
     // -------------------------------------------------------------------------
@@ -219,7 +220,7 @@ public final class BinaryInMemorySortBuffer extends BinaryIndexedSortable {
 
             @Override
             public BinaryRowData next() {
-                throw new RuntimeException("Not support!");
+                return next((BinaryRowData) inputSerializer.createInstance());
             }
         };
     }

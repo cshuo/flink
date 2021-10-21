@@ -21,6 +21,8 @@ package org.apache.flink.table.storage.filestore.lsm;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.storage.filestore.utils.DualIterator;
 
+import java.io.EOFException;
+import java.io.IOException;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.Map;
@@ -30,13 +32,19 @@ import java.util.TreeMap;
 public class HeapMemTable implements MemTable {
 
     private final TreeMap<StoreKey, RowData> table;
+    private final int maxMemRecords;
 
-    public HeapMemTable(Comparator<RowData> comparator) {
+    public HeapMemTable(Comparator<RowData> comparator, int maxMemRecords) {
         table = new TreeMap<>(new StoreKeyComparator(comparator));
+        this.maxMemRecords = maxMemRecords;
     }
 
     @Override
-    public void put(long sequenceNumber, ValueKind valueType, RowData key, RowData value) {
+    public void put(long sequenceNumber, ValueKind valueType, RowData key, RowData value)
+            throws IOException {
+        if (table.size() > maxMemRecords) {
+            throw new EOFException("The write-buffer is too small.");
+        }
         table.put(new StoreKey(key, sequenceNumber, valueType), value);
     }
 

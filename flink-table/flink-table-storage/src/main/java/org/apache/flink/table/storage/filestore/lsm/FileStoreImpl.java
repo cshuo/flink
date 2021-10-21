@@ -24,6 +24,7 @@ import org.apache.flink.connector.file.src.FileSourceSplit;
 import org.apache.flink.connector.file.src.reader.BulkFormat;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.runtime.typeutils.InternalSerializers;
 import org.apache.flink.table.storage.filestore.lsm.compaction.AllCompaction;
 import org.apache.flink.table.storage.filestore.lsm.compaction.CompactStrategy;
 import org.apache.flink.table.storage.filestore.lsm.compaction.CompactionUnit;
@@ -36,7 +37,9 @@ import org.apache.flink.table.storage.filestore.utils.AdvanceIterator;
 import org.apache.flink.table.storage.filestore.utils.DualIterator;
 import org.apache.flink.table.storage.filestore.utils.FileFactory;
 import org.apache.flink.table.storage.filestore.utils.SortMergeIterator;
+import org.apache.flink.table.types.logical.RowType;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -70,8 +73,8 @@ public class FileStoreImpl implements FileStore {
             Path storeDir,
             int keyArity,
             int valueArity,
-            TypeSerializer<RowData> keySerializer,
-            TypeSerializer<RowData> valueSerializer,
+            RowType keyType,
+            RowType valueType,
             Comparator<RowData> keyComparator,
             BulkWriter.Factory<RowData> writerFactory,
             BulkFormat<RowData, FileSourceSplit> readerFactory,
@@ -82,12 +85,15 @@ public class FileStoreImpl implements FileStore {
         this.storeDir = storeDir;
         this.keyArity = keyArity;
         this.valueArity = valueArity;
-        this.keySerializer = keySerializer;
-        this.valueSerializer = valueSerializer;
+        this.keySerializer = InternalSerializers.create(keyType);
+        this.valueSerializer = InternalSerializers.create(valueType);
         this.keyComparator = keyComparator;
         this.writerFactory = writerFactory;
         this.readerFactory = readerFactory;
-        this.memTable = new HeapMemTable(keyComparator);
+        this.memTable =
+                options.binaryEnabled
+                        ? new BinaryMemTable(keyType, valueType, options.maxMemBytes)
+                        : new HeapMemTable(keyComparator, options.maxMemRecords);
         this.mergePolicy = mergePolicy;
         this.nameFactory =
                 new FileFactory(storeDir, "sst", UUID.randomUUID().toString(), fileExtension);
@@ -101,23 +107,24 @@ public class FileStoreImpl implements FileStore {
 
     @Override
     public void put(RowData key, RowData value) throws StoreException {
-        memTable.put(levels.newSequenceNumber(), ValueKind.ADD, key, value);
-        checkFlush();
+        writeBuffer(key, value, ValueKind.ADD);
     }
 
     @Override
     public void delete(RowData key, RowData value) throws StoreException {
-        memTable.put(levels.newSequenceNumber(), ValueKind.DELETE, key, value);
-        checkFlush();
+        writeBuffer(key, value, ValueKind.DELETE);
     }
 
-    private void checkFlush() {
-        if (memTable.size() > options.maxMemRecords) {
+    private void writeBuffer(RowData key, RowData value, ValueKind valueKind) {
+        try {
             try {
+                memTable.put(levels.newSequenceNumber(), valueKind, key, value);
+            } catch (EOFException e) {
                 flush();
-            } catch (IOException e) {
-                throw new StoreException(e);
+                memTable.put(levels.newSequenceNumber(), valueKind, key, value);
             }
+        } catch (IOException e) {
+            throw new StoreException(e);
         }
     }
 

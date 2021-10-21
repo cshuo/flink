@@ -23,6 +23,7 @@ import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.configuration.MemorySize;
 import org.apache.flink.table.storage.logstore.LogStoreFactory.LogScanStartupMode;
 
+import static org.apache.flink.configuration.ConfigOptions.key;
 import static org.apache.flink.table.factories.FactoryUtil.FORMAT_SUFFIX;
 
 /** */
@@ -122,4 +123,15 @@ public class Options {
                     .enumType(LogScanStartupMode.class)
                     .defaultValue(LogScanStartupMode.INITIAL)
                     .withDescription("Startup mode for log consumer.");
+
+    public static final ConfigOption<Boolean> FILE_WRITE_BUFFER_BINARY_ENABLED =
+            ConfigOptions.key("file.write-buffer.binary-enabled")
+                    .booleanType()
+                    .defaultValue(true)
+                    .withDescription("");
+    public static final ConfigOption<MemorySize> FILE_WRITE_BUFFER_MEMORY_SIZE =
+            key("file.write-buffer.memory-size")
+                    .memoryType()
+                    .defaultValue(MemorySize.parse("32 mb"))
+                    .withDescription("");
 }

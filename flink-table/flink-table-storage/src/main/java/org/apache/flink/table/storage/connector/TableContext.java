@@ -51,6 +51,8 @@ import static org.apache.flink.table.storage.Options.FILE_META_TARGET_FILE_SIZE;
 import static org.apache.flink.table.storage.Options.FILE_MIN_FILE_SIZE;
 import static org.apache.flink.table.storage.Options.FILE_NUM_LEVELS;
 import static org.apache.flink.table.storage.Options.FILE_TARGET_FILE_SIZE;
+import static org.apache.flink.table.storage.Options.FILE_WRITE_BUFFER_BINARY_ENABLED;
+import static org.apache.flink.table.storage.Options.FILE_WRITE_BUFFER_MEMORY_SIZE;
 import static org.apache.flink.table.storage.Options.LOG_SCAN_STARTUP_MODE;
 import static org.apache.flink.table.storage.Options.SNAPSHOTS_NUM_EXPIRE_TRIGGER;
 import static org.apache.flink.table.storage.Options.SNAPSHOTS_NUM_RETAINED;
@@ -149,11 +151,13 @@ public class TableContext {
                                 options.get(FILE_MIN_FILE_SIZE).getBytes(),
                                 options.get(FILE_COMPACTION_MAX_SIZE_AMPLIFICATION_PERCENT),
                                 options.get(FILE_COMPACTION_SIZE_RATIO),
-                                options.get(FILE_COMMIT_FORCE_COMPACT)),
+                                options.get(FILE_COMMIT_FORCE_COMPACT),
+                                options.get(FILE_WRITE_BUFFER_BINARY_ENABLED),
+                                options.get(FILE_WRITE_BUFFER_MEMORY_SIZE).getBytes()),
                         processor.comparator(),
                         tablePath,
-                        processor.keySerializer(),
-                        processor.valueSerializer(),
+                        processor.keyType(),
+                        processor.valueType(),
                         processor.compactStrategy(),
                         formats,
                         options.get(FILE_FORMAT));

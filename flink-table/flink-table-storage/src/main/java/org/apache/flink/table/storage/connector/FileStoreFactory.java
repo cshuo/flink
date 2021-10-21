@@ -21,13 +21,13 @@ package org.apache.flink.table.storage.connector;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.table.runtime.generated.GeneratedRecordComparator;
 import org.apache.flink.table.runtime.generated.RecordComparator;
-import org.apache.flink.table.runtime.typeutils.RowDataSerializer;
 import org.apache.flink.table.storage.filestore.lsm.FileStore;
 import org.apache.flink.table.storage.filestore.lsm.FileStoreImpl;
 import org.apache.flink.table.storage.filestore.lsm.StoreOptions;
 import org.apache.flink.table.storage.filestore.lsm.merge.MergePolicy;
 import org.apache.flink.table.storage.filestore.lsm.sst.SstFileMeta;
 import org.apache.flink.table.storage.filestore.utils.FileFactory;
+import org.apache.flink.table.types.logical.RowType;
 
 import java.util.List;
 
@@ -37,8 +37,8 @@ public class FileStoreFactory implements FileStore.Factory {
     private final StoreOptions options;
     private final GeneratedRecordComparator keyComparator;
     private final Path tablePath;
-    private final RowDataSerializer keySerializer;
-    private final RowDataSerializer valueSerializer;
+    private final RowType keyType;
+    private final RowType valueType;
     private final MergePolicy mergePolicy;
     private final TableStorageFormats formats;
     private final String dataFormat;
@@ -47,8 +47,8 @@ public class FileStoreFactory implements FileStore.Factory {
             StoreOptions options,
             GeneratedRecordComparator keyComparator,
             Path tablePath,
-            RowDataSerializer keySerializer,
-            RowDataSerializer valueSerializer,
+            RowType keyType,
+            RowType valueType,
             MergePolicy mergePolicy,
             TableStorageFormats formats,
             String dataFormat) {
@@ -56,8 +56,8 @@ public class FileStoreFactory implements FileStore.Factory {
         this.mergePolicy = mergePolicy;
         this.keyComparator = keyComparator;
         this.tablePath = tablePath;
-        this.keySerializer = keySerializer;
-        this.valueSerializer = valueSerializer;
+        this.keyType = keyType;
+        this.valueType = valueType;
         this.formats = formats;
         this.dataFormat = dataFormat;
     }
@@ -69,10 +69,10 @@ public class FileStoreFactory implements FileStore.Factory {
         return new FileStoreImpl(
                 options,
                 new Path(tablePath, FileFactory.BUCKET_DIR_PREFIX + bucket),
-                keySerializer.getArity(),
-                valueSerializer.getArity(),
-                keySerializer,
-                valueSerializer,
+                keyType.getFieldCount(),
+                valueType.getFieldCount(),
+                keyType,
+                valueType,
                 comparator,
                 formats.getDataWriter(),
                 formats.getDataReader(),

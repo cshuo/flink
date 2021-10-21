@@ -21,10 +21,13 @@ package org.apache.flink.table.storage.filestore.lsm;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.storage.filestore.utils.DualIterator;
 
+import java.io.IOException;
+
 /** */
 public interface MemTable {
 
-    void put(long sequenceNusmber, ValueKind valueType, RowData key, RowData value);
+    void put(long sequenceNumber, ValueKind valueType, RowData key, RowData value)
+            throws IOException;
 
     int size();
 
