@@ -53,6 +53,14 @@ public final class ColumnarRowData implements RowData, TypedSetters {
         this.rowId = rowId;
     }
 
+    public VectorizedColumnBatch getVectorizedColumnBatch() {
+        return vectorizedColumnBatch;
+    }
+
+    public int getRowId() {
+        return rowId;
+    }
+
     @Override
     public RowKind getRowKind() {
         return rowKind;

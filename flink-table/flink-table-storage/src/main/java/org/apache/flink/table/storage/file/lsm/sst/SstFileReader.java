@@ -24,7 +24,9 @@ import org.apache.flink.connector.file.src.FileSourceSplit;
 import org.apache.flink.connector.file.src.reader.BulkFormat;
 import org.apache.flink.connector.file.src.util.RecordAndPosition;
 import org.apache.flink.core.fs.Path;
+import org.apache.flink.table.data.ColumnarRowData;
 import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.filesystem.ColumnarRowIterator;
 import org.apache.flink.table.storage.file.lsm.KeyValue;
 import org.apache.flink.table.storage.file.lsm.ValueKind;
 import org.apache.flink.table.storage.file.utils.DualIterator;
@@ -62,48 +64,104 @@ public class SstFileReader {
                         "DUMMY", path, 0, path.getFileSystem().getFileStatus(path).getLen());
         BulkFormat.Reader<RowData> reader = readerFactory.createReader(configuration, split);
 
+        BulkFormat.RecordIterator<RowData> firstIterator = reader.readBatch();
+
+        // In case of column storage, the following optimization will be done to achieve the effect
+        // of zero copy.
+        boolean isColumnar = firstIterator instanceof ColumnarRowIterator;
+
         return new DualIterator<KeyValue>() {
 
-            private KeyValue previous = new KeyValue();
-            private KeyValue current = new KeyValue();
+            private BulkFormat.RecordIterator<RowData> batchIterator = firstIterator;
 
-            private BulkFormat.RecordIterator<RowData> batchIterator = reader.readBatch();
+            private ColumnarRowData previousColumnarRow = new ColumnarRowData();
+            private KeyValue previous = createKeyValue(previousColumnarRow);
 
-            private void switchKeyValue() {
+            private ColumnarRowData currentColumnarRow = new ColumnarRowData();
+            private KeyValue current = createKeyValue(currentColumnarRow);
+
+            private KeyValue copiedPrevious;
+
+            private void switchKeyValue(boolean newBatch) {
                 KeyValue tmp = previous;
                 previous = current;
                 current = tmp;
+
+                ColumnarRowData tmpRow = previousColumnarRow;
+                previousColumnarRow = currentColumnarRow;
+                currentColumnarRow = tmpRow;
+
+                if (!newBatch) {
+                    copiedPrevious = null;
+                }
+            }
+
+            private KeyValue createKeyValue(ColumnarRowData columnarRow) {
+                if (isColumnar) {
+                    // create wrappers for ColumnarRowData
+                    OffsetRowData key = new OffsetRowData(keyArity, 0).replace(columnarRow);
+                    OffsetRowData value =
+                            new OffsetRowData(valueArity, keyArity + 2).replace(columnarRow);
+                    return new KeyValue().replace(key, -1, null, value);
+                }
+
+                return new KeyValue();
             }
 
             @Override
             public boolean advanceNext() throws IOException {
+                return advanceNext(false);
+            }
+
+            private boolean advanceNext(boolean newBatch) throws IOException {
                 if (batchIterator == null) {
-                    switchKeyValue();
+                    switchKeyValue(newBatch);
                     return false;
                 }
 
                 RecordAndPosition<RowData> record = batchIterator.next();
                 if (record != null) {
-                    switchKeyValue();
-                    RowData row = record.getRecord();
-                    // TODO avoid copy
+                    switchKeyValue(newBatch);
+                    setCurrent(record.getRecord());
+                    return true;
+                } else {
+                    copiedPrevious =
+                            new KeyValue()
+                                    .replace(
+                                            keySerializer.copy(current.key()),
+                                            current.sequenceNumber(),
+                                            current.valueKind(),
+                                            valueSerializer.copy((current.value())));
+                    batchIterator.releaseBatch();
+                    batchIterator = reader.readBatch();
+                    return advanceNext(true);
+                }
+            }
+
+            private void setCurrent(RowData row) {
+                long sequenceNumber = row.getLong(keyArity);
+                ValueKind valueKind = ValueKind.fromByteValue(row.getByte(keyArity + 1));
+
+                if (isColumnar) {
+                    ColumnarRowData copyFrom = (ColumnarRowData) row;
+                    currentColumnarRow.setVectorizedColumnBatch(
+                            copyFrom.getVectorizedColumnBatch());
+                    currentColumnarRow.setRowId(copyFrom.getRowId());
+                    current.setSequenceNumber(sequenceNumber);
+                    current.setValueKind(valueKind);
+                } else {
                     current.replace(
                             keySerializer.copy(new OffsetRowData(keyArity, 0).replace(row)),
                             row.getLong(keyArity),
-                            ValueKind.fromByteValue(row.getByte(keyArity + 1)),
+                            valueKind,
                             valueSerializer.copy(
                                     new OffsetRowData(valueArity, keyArity + 2).replace(row)));
-                    return true;
-                } else {
-                    batchIterator.releaseBatch();
-                    batchIterator = reader.readBatch();
-                    return advanceNext();
                 }
             }
 
             @Override
             public KeyValue previous() {
-                return previous;
+                return copiedPrevious != null ? copiedPrevious : previous;
             }
 
             @Override

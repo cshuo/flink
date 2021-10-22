@@ -80,7 +80,7 @@ public class CountIterator implements AdvanceIterator<KeyValue> {
 
     @Override
     public KeyValue current() {
-        return iterator.previous().replaceValue(GenericRowData.of(count));
+        return iterator.previous().setValue(GenericRowData.of(count));
     }
 
     private long currentCount() {
