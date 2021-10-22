@@ -72,6 +72,11 @@ public class DataStreamSink<T> {
         }
     }
 
+    @Internal
+    public PhysicalTransformation<T> transformation() {
+        return transformation;
+    }
+
     /**
      * Sets the name of this sink. This name is used by the visualization and logging during
      * runtime.

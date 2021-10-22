@@ -107,6 +107,14 @@ public class SortSpec {
                 .toArray(LogicalType[]::new);
     }
 
+    public static SortSpec defaultSortAll(int fieldCount) {
+        SortSpec.SortSpecBuilder builder = SortSpec.builder();
+        for (int i = 0; i < fieldCount; i++) {
+            builder.addField(i, true, false);
+        }
+        return builder.build();
+    }
+
     public static SortSpecBuilder builder() {
         return new SortSpecBuilder();
     }

@@ -303,7 +303,7 @@ public abstract class CommonExecSink extends ExecNodeBase<Object>
         if (runtimeProvider instanceof DataStreamSinkProvider) {
             final DataStream<RowData> dataStream = new DataStream<>(env, inputTransform);
             final DataStreamSinkProvider provider = (DataStreamSinkProvider) runtimeProvider;
-            return provider.consumeDataStream(dataStream).getTransformation();
+            return provider.consumeDataStream(dataStream).transformation();
         } else if (runtimeProvider instanceof TransformationSinkProvider) {
             final TransformationSinkProvider provider =
                     (TransformationSinkProvider) runtimeProvider;

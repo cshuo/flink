@@ -22,6 +22,7 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSink;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.transformations.LegacySinkTransformation;
+import org.apache.flink.streaming.api.transformations.PhysicalTransformation;
 
 /**
  * A {@link DataStreamSink} which is used to collect results of a data stream. It completely
@@ -42,6 +43,12 @@ public class CollectStreamSink<T> extends DataStreamSink<T> {
     @Override
     public LegacySinkTransformation<T> getTransformation() {
         return transformation;
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public PhysicalTransformation<T> transformation() {
+        return (PhysicalTransformation<T>) transformation;
     }
 
     @Override
