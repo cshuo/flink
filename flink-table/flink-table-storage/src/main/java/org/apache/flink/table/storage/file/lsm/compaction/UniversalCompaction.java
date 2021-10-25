@@ -20,10 +20,7 @@ package org.apache.flink.table.storage.file.lsm.compaction;
 
 import org.apache.flink.table.storage.file.lsm.Level;
 import org.apache.flink.table.storage.file.lsm.compaction.CompactionUnit.SortedRun;
-import org.apache.flink.table.storage.file.lsm.sst.SstFileMeta;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 /**
@@ -48,18 +45,7 @@ public class UniversalCompaction implements CompactStrategy {
         int maxLevel = levels.size() - 1;
 
         // 1. construct sort runs
-        List<SortedRun> runs = new ArrayList<>();
-
-        for (SstFileMeta file : levels.get(0).files()) {
-            runs.add(new SortedRun(0, file.getFileSize(), Collections.singletonList(file)));
-        }
-
-        for (int i = 1; i < levels.size(); i++) {
-            Level level = levels.get(i);
-            if (level.files().size() > 0) {
-                runs.add(new SortedRun(i, level.totalSize(), level.files()));
-            }
-        }
+        List<SortedRun> runs = createRuns(levels);
 
         // 2. pick
         if (runs.size() >= maxRunNum) {

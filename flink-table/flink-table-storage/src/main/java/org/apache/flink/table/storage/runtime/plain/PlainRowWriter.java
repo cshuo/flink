@@ -53,6 +53,11 @@ public class PlainRowWriter implements RowWriter {
     }
 
     @Override
+    public int numBucket() {
+        return numBucket;
+    }
+
+    @Override
     public void add(FileStore store) {
         store.put(row, GenericRowData.of(1L));
     }

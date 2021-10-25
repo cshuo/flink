@@ -135,7 +135,8 @@ public class DynamicSinkWriter implements SinkWriter<RowData, DynamicCommittable
             return null;
         }
 
-        return new DynamicCommittable(partition, bucket, addFiles, deleteFiles);
+        return new DynamicCommittable(
+                partition, bucket, rowWriter.numBucket(), addFiles, deleteFiles);
     }
 
     @Override

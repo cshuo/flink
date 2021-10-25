@@ -41,17 +41,18 @@ public class DynamicCommittable {
     public DynamicCommittable(
             String partition,
             int bucket,
+            int numBucket,
             List<SstFileMeta> addFiles,
             List<SstFileMeta> deleteFiles) {
         this.entries = new ArrayList<>();
 
         // always delete files first, otherwise upgrade files will be ignored
         for (SstFileMeta file : deleteFiles) {
-            entries.add(new ManifestEntry(FileKind.DELETE, partition, bucket, file));
+            entries.add(new ManifestEntry(FileKind.DELETE, partition, bucket, numBucket, file));
         }
 
         for (SstFileMeta file : addFiles) {
-            entries.add(new ManifestEntry(FileKind.ADD, partition, bucket, file));
+            entries.add(new ManifestEntry(FileKind.ADD, partition, bucket, numBucket, file));
         }
     }
 

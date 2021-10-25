@@ -24,6 +24,7 @@ import org.apache.flink.connector.file.src.FileSourceSplit;
 import org.apache.flink.connector.file.src.reader.BulkFormat;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.storage.file.lsm.compaction.AllCompaction;
 import org.apache.flink.table.storage.file.lsm.compaction.CompactStrategy;
 import org.apache.flink.table.storage.file.lsm.compaction.CompactionUnit;
 import org.apache.flink.table.storage.file.lsm.compaction.UniversalCompaction;
@@ -136,7 +137,10 @@ public class FileStoreImpl implements FileStore {
             }
         }
 
-        CompactionUnit compactionUnit = compactStrategy.pick(levels.levels());
+        CompactionUnit compactionUnit =
+                options.commitForceCompact
+                        ? AllCompaction.INSTANCE.pick(levels.levels())
+                        : compactStrategy.pick(levels.levels());
         if (compactionUnit != null) {
             // TODO async compaction
             compact(compactionUnit);
@@ -195,6 +199,7 @@ public class FileStoreImpl implements FileStore {
     }
 
     private AdvanceIterator<KeyValue> sectionIterator(Overlap.Section section) {
+        // TODO sort files to reduce file readings in the same time.
         return merge(section.files().stream().map(this::fileIterator).collect(Collectors.toList()));
     }
 

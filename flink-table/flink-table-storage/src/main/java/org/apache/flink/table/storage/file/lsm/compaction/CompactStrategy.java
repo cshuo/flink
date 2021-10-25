@@ -19,10 +19,33 @@
 package org.apache.flink.table.storage.file.lsm.compaction;
 
 import org.apache.flink.table.storage.file.lsm.Level;
+import org.apache.flink.table.storage.file.lsm.sst.SstFileMeta;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /** */
 public interface CompactStrategy {
+
+    default List<CompactionUnit.SortedRun> createRuns(List<Level> levels) {
+        List<CompactionUnit.SortedRun> runs = new ArrayList<>();
+
+        for (SstFileMeta file : levels.get(0).files()) {
+            runs.add(
+                    new CompactionUnit.SortedRun(
+                            0, file.getFileSize(), Collections.singletonList(file)));
+        }
+
+        for (int i = 1; i < levels.size(); i++) {
+            Level level = levels.get(i);
+            if (level.files().size() > 0) {
+                runs.add(new CompactionUnit.SortedRun(i, level.totalSize(), level.files()));
+            }
+        }
+
+        return runs;
+    }
+
     CompactionUnit pick(List<Level> levels);
 }

@@ -100,4 +100,10 @@ public class TableStorageOptions {
                     .intType()
                     .defaultValue(1)
                     .withDescription("");
+
+    public static final ConfigOption<Boolean> FILE_COMMIT_FORCE_COMPACT =
+            ConfigOptions.key("file.commit.force-compact")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription("");
 }

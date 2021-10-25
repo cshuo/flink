@@ -48,12 +48,16 @@ public class ManifestEntry {
 
     private final int bucket;
 
+    private final int numBucket;
+
     private final SstFileMeta file;
 
-    public ManifestEntry(FileKind kind, String partition, int bucket, SstFileMeta file) {
+    public ManifestEntry(
+            FileKind kind, String partition, int bucket, int numBucket, SstFileMeta file) {
         this.kind = kind;
         this.partition = partition;
         this.bucket = bucket;
+        this.numBucket = numBucket;
         this.file = file;
     }
 
@@ -69,6 +73,10 @@ public class ManifestEntry {
         return bucket;
     }
 
+    public int numBucket() {
+        return numBucket;
+    }
+
     public String name() {
         return file.getName();
     }
@@ -78,18 +86,19 @@ public class ManifestEntry {
     }
 
     public RowData toRow() {
-        GenericRowData row = new GenericRowData(11);
+        GenericRowData row = new GenericRowData(12);
         row.setField(0, kind.toByteValue());
         row.setField(1, StringData.fromString(partition));
         row.setField(2, bucket);
-        row.setField(3, StringData.fromString(file.getName()));
-        row.setField(4, file.getFileSize());
-        row.setField(5, file.getRowCount());
-        row.setField(6, file.getMinKey().toRow());
-        row.setField(7, file.getMaxKey().toRow());
-        row.setField(8, file.getMinSequenceNumber());
-        row.setField(9, file.getMaxSequenceNumber());
-        row.setField(10, file.getLevel());
+        row.setField(3, numBucket);
+        row.setField(4, StringData.fromString(file.getName()));
+        row.setField(5, file.getFileSize());
+        row.setField(6, file.getRowCount());
+        row.setField(7, file.getMinKey().toRow());
+        row.setField(8, file.getMaxKey().toRow());
+        row.setField(9, file.getMinSequenceNumber());
+        row.setField(10, file.getMaxSequenceNumber());
+        row.setField(11, file.getLevel());
         return row;
     }
 
@@ -98,6 +107,7 @@ public class ManifestEntry {
         fields.add(new RowType.RowField("_FILE_KIND", new TinyIntType(false)));
         fields.add(new RowType.RowField("_PARTITION", new VarCharType(Integer.MAX_VALUE)));
         fields.add(new RowType.RowField("_BUCKET", new IntType(false)));
+        fields.add(new RowType.RowField("_TOTAL_BUCKETS", new IntType(false)));
         fields.add(new RowType.RowField("_FILE_NAME", new VarCharType(false, Integer.MAX_VALUE)));
         fields.add(new RowType.RowField("_FILE_SIZE", new BigIntType(false)));
         fields.add(new RowType.RowField("_ROW_COUNT", new BigIntType(false)));
@@ -114,15 +124,16 @@ public class ManifestEntry {
                 FileKind.fromByteValue(row.getByte(0)),
                 row.isNullAt(1) ? null : row.getString(1).toString(),
                 row.getInt(2),
+                row.getInt(3),
                 new SstFileMeta(
-                        row.getString(3).toString(),
-                        row.getLong(4),
+                        row.getString(4).toString(),
                         row.getLong(5),
-                        StoreKey.fromRow(row.getRow(6, StoreKey.FIELD_COUNT), keyArity, keySer),
+                        row.getLong(6),
                         StoreKey.fromRow(row.getRow(7, StoreKey.FIELD_COUNT), keyArity, keySer),
-                        row.getLong(8),
+                        StoreKey.fromRow(row.getRow(8, StoreKey.FIELD_COUNT), keyArity, keySer),
                         row.getLong(9),
-                        row.getInt(10)));
+                        row.getLong(10),
+                        row.getInt(11)));
     }
 
     public void serialize(DataOutputView target, TypeSerializer<RowData> keySerializer)
@@ -130,6 +141,7 @@ public class ManifestEntry {
         target.writeByte(kind.toByteValue());
         nullableSerialize(target, partition);
         target.writeInt(bucket);
+        target.writeInt(numBucket);
         file.serialize(target, keySerializer);
     }
 
@@ -138,6 +150,7 @@ public class ManifestEntry {
         return new ManifestEntry(
                 FileKind.fromByteValue(in.readByte()),
                 nullableDeserialize(in),
+                in.readInt(),
                 in.readInt(),
                 SstFileMeta.deserialize(in, keySerializer));
     }

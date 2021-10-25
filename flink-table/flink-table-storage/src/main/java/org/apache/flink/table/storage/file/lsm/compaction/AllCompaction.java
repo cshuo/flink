@@ -16,23 +16,19 @@
  * limitations under the License.
  */
 
-package org.apache.flink.table.storage.runtime;
+package org.apache.flink.table.storage.file.lsm.compaction;
 
-import org.apache.flink.table.data.RowData;
-import org.apache.flink.table.storage.file.lsm.FileStore;
+import org.apache.flink.table.storage.file.lsm.Level;
 
-import java.io.Serializable;
+import java.util.List;
 
 /** */
-public interface RowWriter extends Serializable {
+public class AllCompaction implements CompactStrategy {
 
-    void start(RowData row);
+    public static final AllCompaction INSTANCE = new AllCompaction();
 
-    int selectBucket();
-
-    int numBucket();
-
-    void add(FileStore store);
-
-    void delete(FileStore store);
+    @Override
+    public CompactionUnit pick(List<Level> levels) {
+        return new CompactionUnit(levels.size() - 1, createRuns(levels));
+    }
 }

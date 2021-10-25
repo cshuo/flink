@@ -54,6 +54,11 @@ public class PrimaryKeyRowWriter implements RowWriter {
     }
 
     @Override
+    public int numBucket() {
+        return numBucket;
+    }
+
+    @Override
     public void add(FileStore store) {
         store.put(key, row);
     }

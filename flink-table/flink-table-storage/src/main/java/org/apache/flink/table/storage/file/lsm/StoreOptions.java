@@ -29,6 +29,7 @@ public class StoreOptions implements Serializable {
     public final long minFileSize;
     public final int maxSizeAmplificationPercent;
     public final int sizeRatio;
+    public final boolean commitForceCompact;
 
     // TODO replace maxMemRecords with maxMemBytes
     public final int maxMemRecords = 10_000;
@@ -39,12 +40,14 @@ public class StoreOptions implements Serializable {
             long targetFileSize,
             long minFileSize,
             int maxSizeAmplificationPercent,
-            int sizeRatio) {
+            int sizeRatio,
+            boolean commitForceCompact) {
         this.numFilesLevel0 = numFilesLevel0;
         this.numLevels = numLevels;
         this.targetFileSize = targetFileSize;
         this.minFileSize = minFileSize;
         this.maxSizeAmplificationPercent = maxSizeAmplificationPercent;
         this.sizeRatio = sizeRatio;
+        this.commitForceCompact = commitForceCompact;
     }
 }

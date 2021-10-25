@@ -43,6 +43,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.apache.flink.table.factories.DefaultDynamicTableFactory.BUCKET;
+import static org.apache.flink.table.storage.TableStorageOptions.FILE_COMMIT_FORCE_COMPACT;
 import static org.apache.flink.table.storage.TableStorageOptions.FILE_COMPACTION_MAX_SIZE_AMPLIFICATION_PERCENT;
 import static org.apache.flink.table.storage.TableStorageOptions.FILE_COMPACTION_SIZE_RATIO;
 import static org.apache.flink.table.storage.TableStorageOptions.FILE_FORMAT;
@@ -165,7 +166,8 @@ public abstract class TableStorageSourceSink {
                                 options.get(FILE_TARGET_FILE_SIZE).getBytes(),
                                 options.get(FILE_MIN_FILE_SIZE).getBytes(),
                                 options.get(FILE_COMPACTION_MAX_SIZE_AMPLIFICATION_PERCENT),
-                                options.get(FILE_COMPACTION_SIZE_RATIO)),
+                                options.get(FILE_COMPACTION_SIZE_RATIO),
+                                options.get(FILE_COMMIT_FORCE_COMPACT)),
                         processor.comparator(),
                         tablePath,
                         processor.keySerializer(),
