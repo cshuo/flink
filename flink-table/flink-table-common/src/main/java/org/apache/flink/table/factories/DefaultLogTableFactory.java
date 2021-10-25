@@ -20,7 +20,10 @@ package org.apache.flink.table.factories;
 
 import org.apache.flink.annotation.Internal;
 
-import java.util.HashMap;
+import javax.annotation.Nullable;
+
+import java.io.Serializable;
+import java.util.Collection;
 import java.util.Map;
 
 /**
@@ -31,24 +34,49 @@ import java.util.Map;
  * writing.
  */
 @Internal
-public interface DefaultLogTableFactory extends DynamicTableFactory {
-
-    String LOG_PREFIX = "log.";
+public interface DefaultLogTableFactory<OFFSET extends Serializable> extends DynamicTableFactory {
 
     @Override
     default String factoryIdentifier() {
         return "_default_log";
     }
 
-    /** @return log options from table options. */
-    static Map<String, String> logOptions(Map<String, String> tableOptions) {
-        Map<String, String> options = new HashMap<>();
-        tableOptions.forEach(
-                (k, v) -> {
-                    if (k.startsWith(LOG_PREFIX)) {
-                        options.put(k.substring(LOG_PREFIX.length()), v);
-                    }
-                });
-        return options;
+    /**
+     * Notifies the listener that a table creation occurred.
+     *
+     * @return new options of this table.
+     */
+    Map<String, String> onTableCreation(Context context, int numBucket);
+
+    /** Notifies the listener that a table drop occurred. */
+    void onTableDrop(Context context);
+
+    // -------------------------- Hybrid consuming -----------------------------
+
+    /**
+     * Notifies the listener that a table consuming occurred.
+     *
+     * @return new options of this table for consuming.
+     */
+    Map<String, String> onTableConsuming(
+            Context context, @Nullable Map<Integer, OFFSET> bucketOffsets);
+
+    /** Gets factory for creating a {@link OffsetsRetriever}. */
+    OffsetsRetrieverFactory createOffsetsRetrieverFactory(Context context);
+
+    /** Factory to create {@link OffsetsRetriever}. */
+    interface OffsetsRetrieverFactory extends Serializable {
+
+        OffsetsRetriever create();
+    }
+
+    /**
+     * An interface that provides necessary information to get the initial offsets of the Log
+     * buckets.
+     */
+    interface OffsetsRetriever {
+
+        /** Get the end offsets for the given buckets. */
+        Map<Integer, Long> endOffsets(Collection<Integer> buckets);
     }
 }

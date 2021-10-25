@@ -28,15 +28,13 @@ import org.apache.flink.table.connector.sink.DynamicTableSink;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.DefaultDynamicTableFactory;
 import org.apache.flink.table.factories.DefaultLogTableFactory;
-import org.apache.flink.table.factories.DynamicTableFactory;
+import org.apache.flink.table.factories.DefaultLogTableFactory.OffsetsRetrieverFactory;
 import org.apache.flink.table.factories.DynamicTableSinkFactory;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
-import org.apache.flink.table.factories.listener.CreateTableListener;
-import org.apache.flink.table.factories.listener.DropTableListener;
-import org.apache.flink.table.factories.listener.TableNotification;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.io.UncheckedIOException;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -44,6 +42,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import static org.apache.flink.table.storage.TableStorageOptions.BUCKET;
 import static org.apache.flink.table.storage.TableStorageOptions.CHANGE_TRACKING;
 import static org.apache.flink.table.storage.TableStorageOptions.FILE_FORMAT;
 import static org.apache.flink.table.storage.TableStorageOptions.FILE_META_FORMAT;
@@ -55,28 +54,14 @@ import static org.apache.flink.table.storage.TableStorageOptions.TABLE_STORAGE_P
 
 /** */
 public class TableStorageFactory
-        implements DynamicTableSourceFactory,
-                DynamicTableSinkFactory,
-                DefaultDynamicTableFactory,
-                CreateTableListener,
-                DropTableListener {
+        implements DynamicTableSourceFactory, DynamicTableSinkFactory, DefaultDynamicTableFactory {
 
-    private Optional<ResolvedCatalogTable> createKafkaTable(DynamicTableFactory.Context context) {
-        Map<String, String> tableOptions = context.getCatalogTable().getOptions();
-        if (changeTracking(tableOptions)) {
-            Map<String, String> logOptions = DefaultLogTableFactory.logOptions(tableOptions);
-            return Optional.of(
-                    new ResolvedCatalogTable(
-                            context.getCatalogTable().getOrigin().copy(logOptions),
-                            context.getCatalogTable().getResolvedSchema()));
-        }
-        return Optional.empty();
-    }
+    public static final String LOG_OPTION_PREFIX = "log.";
 
     @Override
-    public DynamicTableSink createDynamicTableSink(DynamicTableFactory.Context context) {
-        Optional<DynamicTableSink> kafkaSink =
-                createKafkaTable(context)
+    public DynamicTableSink createDynamicTableSink(Context context) {
+        DynamicTableSink logSink =
+                createLogTable(context)
                         .map(
                                 catalogTable ->
                                         FactoryUtil.createTableSink(
@@ -85,14 +70,17 @@ public class TableStorageFactory
                                                 catalogTable,
                                                 context.getConfiguration(),
                                                 context.getClassLoader(),
-                                                context.isTemporary()));
-        return new TableStorageSink(this, context, kafkaSink.orElse(null));
+                                                context.isTemporary()))
+                        .orElse(null);
+        OffsetsRetrieverFactory offsetsRetrieverFactory =
+                createOffsetsRetrieverFactory(context).orElse(null);
+        return new TableStorageSink(this, context, logSink, offsetsRetrieverFactory);
     }
 
     @Override
-    public DynamicTableSource createDynamicTableSource(DynamicTableFactory.Context context) {
-        Optional<DynamicTableSource> kafkaSource =
-                createKafkaTable(context)
+    public DynamicTableSource createDynamicTableSource(Context context) {
+        DynamicTableSource logSource =
+                createLogTable(context)
                         .map(
                                 catalogTable ->
                                         FactoryUtil.createTableSource(
@@ -101,8 +89,9 @@ public class TableStorageFactory
                                                 catalogTable,
                                                 context.getConfiguration(),
                                                 context.getClassLoader(),
-                                                context.isTemporary()));
-        return new TableStorageSource(this, context, kafkaSource.orElse(null));
+                                                context.isTemporary()))
+                        .orElse(null);
+        return new TableStorageSource(this, context, logSource);
     }
 
     @Override
@@ -125,10 +114,10 @@ public class TableStorageFactory
     }
 
     @Override
-    public Map<String, String> onTableCreation(TableNotification notification) {
-        CatalogTable table = notification.getCatalogTable();
+    public Map<String, String> onTableCreation(Context context) {
+        CatalogTable table = context.getCatalogTable();
         Map<String, String> newOptions = new HashMap<>(table.getOptions());
-        ((Configuration) notification.getConfiguration())
+        ((Configuration) context.getConfiguration())
                 .toMap()
                 .forEach(
                         (k, v) -> {
@@ -138,7 +127,7 @@ public class TableStorageFactory
                             }
                         });
 
-        Path path = tablePath(newOptions, notification.getObjectIdentifier());
+        Path path = tablePath(newOptions, context.getObjectIdentifier());
         try {
             path.getFileSystem().mkdirs(path);
         } catch (IOException e) {
@@ -146,22 +135,24 @@ public class TableStorageFactory
         }
 
         if (changeTracking(newOptions)) {
-            DefaultLogTableFactory logFactory =
-                    DefaultDynamicTableFactory.discoverDefaultLogFactory(
-                            notification.getClassLoader());
-            if (logFactory instanceof CreateTableListener) {
-                return ((CreateTableListener) logFactory)
-                        .onTableCreation(notification.copy(newOptions));
-            }
+            DefaultLogTableFactory<?> logFactory =
+                    DefaultDynamicTableFactory.discoverDefaultLogFactory(context.getClassLoader());
+            int numBucket =
+                    Integer.parseInt(
+                            newOptions.getOrDefault(
+                                    BUCKET.key(), BUCKET.defaultValue().toString()));
+            Map<String, String> newLogOptions =
+                    logFactory.onTableCreation(copyContext(context, newOptions), numBucket);
+            newLogOptions.forEach((k, v) -> newOptions.put(LOG_OPTION_PREFIX + k, v));
         }
 
         return newOptions;
     }
 
     @Override
-    public void onTableDrop(TableNotification notification) {
-        Map<String, String> options = notification.getCatalogTable().getOptions();
-        Path path = tablePath(options, notification.getObjectIdentifier());
+    public void onTableDrop(Context context) {
+        Map<String, String> options = context.getCatalogTable().getOptions();
+        Path path = tablePath(options, context.getObjectIdentifier());
         try {
             path.getFileSystem().delete(path, true);
         } catch (IOException e) {
@@ -169,13 +160,44 @@ public class TableStorageFactory
         }
 
         if (changeTracking(options)) {
-            DefaultLogTableFactory logFactory =
-                    DefaultDynamicTableFactory.discoverDefaultLogFactory(
-                            notification.getClassLoader());
-            if (logFactory instanceof DropTableListener) {
-                ((DropTableListener) logFactory).onTableDrop(notification);
-            }
+            DefaultLogTableFactory<?> logFactory =
+                    DefaultDynamicTableFactory.discoverDefaultLogFactory(context.getClassLoader());
+            logFactory.onTableDrop(copyContext(context, logOptions(options)));
         }
+    }
+
+    private Optional<ResolvedCatalogTable> createLogTable(Context context) {
+        Map<String, String> tableOptions = context.getCatalogTable().getOptions();
+        if (changeTracking(tableOptions)) {
+            Map<String, String> logOptions = logOptions(tableOptions);
+            return Optional.of(
+                    new ResolvedCatalogTable(
+                            context.getCatalogTable().getOrigin().copy(logOptions),
+                            context.getCatalogTable().getResolvedSchema()));
+        }
+        return Optional.empty();
+    }
+
+    private Optional<OffsetsRetrieverFactory> createOffsetsRetrieverFactory(Context context) {
+        Map<String, String> tableOptions = context.getCatalogTable().getOptions();
+        if (changeTracking(tableOptions)) {
+            Map<String, String> logOptions = logOptions(tableOptions);
+            DefaultLogTableFactory<Serializable> logTableFactory =
+                    DefaultDynamicTableFactory.discoverDefaultLogFactory(context.getClassLoader());
+            return Optional.of(
+                    logTableFactory.createOffsetsRetrieverFactory(
+                            copyContext(context, logOptions(tableOptions))));
+        }
+        return Optional.empty();
+    }
+
+    private Context copyContext(Context context, Map<String, String> newOptions) {
+        return new FactoryUtil.DefaultDynamicTableContext(
+                context.getObjectIdentifier(),
+                context.getCatalogTable().copy(newOptions),
+                context.getConfiguration(),
+                context.getClassLoader(),
+                context.isTemporary());
     }
 
     static boolean changeTracking(Map<String, String> options) {
@@ -186,5 +208,17 @@ public class TableStorageFactory
 
     static Path tablePath(Map<String, String> options, ObjectIdentifier identifier) {
         return new Path(new Path(options.get(FILE_ROOT_PATH.key())), identifier.asSummaryString());
+    }
+
+    /** @return log options from table options. */
+    static Map<String, String> logOptions(Map<String, String> tableOptions) {
+        Map<String, String> options = new HashMap<>();
+        tableOptions.forEach(
+                (k, v) -> {
+                    if (k.startsWith(LOG_OPTION_PREFIX)) {
+                        options.put(k.substring(LOG_OPTION_PREFIX.length()), v);
+                    }
+                });
+        return options;
     }
 }

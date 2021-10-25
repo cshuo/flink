@@ -93,9 +93,10 @@ public class Table implements Serializable {
         return basePath;
     }
 
-    public void commitChanges(List<ManifestEntry> newFiles) throws IOException {
+    public void commitChanges(List<ManifestEntry> newFiles, Map<Integer, Long> logOffsets)
+            throws IOException {
         while (true) {
-            if (tryCommit(newFiles)) {
+            if (tryCommit(newFiles, logOffsets)) {
                 return;
             } else {
                 // TODO fail when check delete files?
@@ -233,7 +234,8 @@ public class Table implements Serializable {
         return snapshots.get(snapshots.size() - 1);
     }
 
-    private boolean tryCommit(List<ManifestEntry> newFiles) throws IOException {
+    private boolean tryCommit(List<ManifestEntry> newFiles, Map<Integer, Long> logOffsets)
+            throws IOException {
         // 1. get all manifests
         Snapshot last = lastSnapshot();
         long snapshotId = last == null ? 0 : last.getId() + 1;

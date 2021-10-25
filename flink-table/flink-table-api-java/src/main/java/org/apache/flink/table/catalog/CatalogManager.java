@@ -36,10 +36,8 @@ import org.apache.flink.table.catalog.exceptions.TableNotExistException;
 import org.apache.flink.table.delegation.Planner;
 import org.apache.flink.table.expressions.resolver.ExpressionResolver.ExpressionResolverBuilder;
 import org.apache.flink.table.factories.DefaultDynamicTableFactory;
-import org.apache.flink.table.factories.listener.CreateTableListener;
-import org.apache.flink.table.factories.listener.DropTableListener;
-import org.apache.flink.table.factories.listener.TableNotification;
-import org.apache.flink.table.factories.listener.TableNotificationImpl;
+import org.apache.flink.table.factories.DynamicTableFactory;
+import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.StringUtils;
 
@@ -679,8 +677,8 @@ public final class CatalogManager {
                 (catalog, path) ->
                         catalog.createTable(
                                 path,
-                                resolveCatalogBaseTable(
-                                        notifyTableCreation(objectIdentifier, table, false)),
+                                notifyTableCreation(
+                                        objectIdentifier, resolveCatalogBaseTable(table), false),
                                 ignoreIfExists),
                 objectIdentifier,
                 false,
@@ -711,8 +709,8 @@ public final class CatalogManager {
                         return v;
                     } else {
                         final CatalogBaseTable resolvedTable =
-                                resolveCatalogBaseTable(
-                                        notifyTableCreation(objectIdentifier, table, true));
+                                notifyTableCreation(
+                                        objectIdentifier, resolveCatalogBaseTable(table), true);
                         if (listener.isPresent()) {
                             return listener.get()
                                     .onCreateTemporaryTable(
@@ -755,7 +753,7 @@ public final class CatalogManager {
         if (filter.test(catalogBaseTable)) {
             getTemporaryOperationListener(objectIdentifier)
                     .ifPresent(l -> l.onDropTemporaryTable(objectIdentifier.toObjectPath()));
-            onDropBuiltInTable(objectIdentifier, catalogBaseTable, true);
+            onDropBuiltInTable(objectIdentifier, resolveCatalogBaseTable(catalogBaseTable), true);
             temporaryTables.remove(objectIdentifier);
         } else if (!ignoreIfNotExists) {
             throw new ValidationException(
@@ -837,7 +835,8 @@ public final class CatalogManager {
 
             execute(
                     (catalog, path) -> {
-                        onDropBuiltInTable(objectIdentifier, resultOpt.get(), false);
+                        onDropBuiltInTable(
+                                objectIdentifier, resolveCatalogBaseTable(resultOpt.get()), false);
                         catalog.dropTable(path, ignoreIfNotExists);
                     },
                     objectIdentifier,
@@ -918,38 +917,37 @@ public final class CatalogManager {
         return new ResolvedCatalogView(view, resolvedSchema);
     }
 
-    /** Notify for {@link CreateTableListener}. */
+    /** Notify for creating table. */
     private CatalogBaseTable notifyTableCreation(
-            ObjectIdentifier identifier, CatalogBaseTable table, boolean isTemporary) {
-        if (table instanceof CatalogTable && !table.getOptions().containsKey(CONNECTOR.key())) {
+            ObjectIdentifier identifier, ResolvedCatalogBaseTable<?> table, boolean isTemporary) {
+        if (table instanceof ResolvedCatalogTable
+                && !table.getOptions().containsKey(CONNECTOR.key())) {
             DefaultDynamicTableFactory factory = discoverDefaultFactory(classLoader);
-            if (factory instanceof CreateTableListener) {
-                Map<String, String> newOptions =
-                        ((CreateTableListener) factory)
-                                .onTableCreation(
-                                        createTableNotification(identifier, table, isTemporary));
-                return ((CatalogTable) table).copy(newOptions);
-            }
+            Map<String, String> newOptions =
+                    factory.onTableCreation(
+                            createDynamicTableFactoryContext(
+                                    identifier, (ResolvedCatalogTable) table, isTemporary));
+            return ((ResolvedCatalogTable) table).copy(newOptions);
         }
 
         return table;
     }
 
-    /** Notify for {@link DropTableListener}. */
+    /** Notify for dropping table. */
     private void onDropBuiltInTable(
-            ObjectIdentifier identifier, CatalogBaseTable table, boolean isTemporary) {
-        if (table instanceof CatalogTable && !table.getOptions().containsKey(CONNECTOR.key())) {
+            ObjectIdentifier identifier, ResolvedCatalogBaseTable<?> table, boolean isTemporary) {
+        if (table instanceof ResolvedCatalogTable
+                && !table.getOptions().containsKey(CONNECTOR.key())) {
             DefaultDynamicTableFactory factory = discoverDefaultFactory(classLoader);
-            if (factory instanceof DropTableListener) {
-                ((DropTableListener) factory)
-                        .onTableDrop(createTableNotification(identifier, table, isTemporary));
-            }
+            factory.onTableDrop(
+                    createDynamicTableFactoryContext(
+                            identifier, (ResolvedCatalogTable) table, isTemporary));
         }
     }
 
-    private TableNotification createTableNotification(
-            ObjectIdentifier identifier, CatalogBaseTable table, boolean isTemporary) {
-        return new TableNotificationImpl(
-                identifier, (CatalogTable) table, config, classLoader, isTemporary);
+    private DynamicTableFactory.Context createDynamicTableFactoryContext(
+            ObjectIdentifier identifier, ResolvedCatalogTable table, boolean isTemporary) {
+        return new FactoryUtil.DefaultDynamicTableContext(
+                identifier, table, config, classLoader, isTemporary);
     }
 }

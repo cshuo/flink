@@ -24,6 +24,7 @@ import org.apache.flink.api.connector.sink.Sink;
 import org.apache.flink.api.connector.sink.SinkWriter;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.factories.DefaultLogTableFactory;
 import org.apache.flink.table.runtime.typeutils.RowDataSerializer;
 import org.apache.flink.table.storage.file.Table;
 import org.apache.flink.table.storage.file.lsm.FileStore;
@@ -32,12 +33,13 @@ import org.apache.flink.table.storage.runtime.RowWriter;
 import javax.annotation.Nullable;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
 /** */
-public class DynamicSink implements Sink<RowData, DynamicCommittable, Long, DynamicCommittable> {
+public class DynamicSink<LogCommT, LogStateT>
+        implements Sink<
+                RowData, DynamicCommittable<LogCommT>, LogStateT, DynamicCommittable<LogCommT>> {
 
     private final Table table;
     private final FileStore.Factory factory;
@@ -45,7 +47,9 @@ public class DynamicSink implements Sink<RowData, DynamicCommittable, Long, Dyna
     private final RowWriter rowWriter;
     private final RowDataSerializer keySerializer;
 
-    @Nullable private final Sink<RowData, ?, ?, ?> kafka;
+    @Nullable private final Sink<RowData, LogCommT, LogStateT, ?> logSink;
+
+    @Nullable private final DefaultLogTableFactory.OffsetsRetrieverFactory offsetsRetrieverFactory;
 
     public DynamicSink(
             Table table,
@@ -53,46 +57,69 @@ public class DynamicSink implements Sink<RowData, DynamicCommittable, Long, Dyna
             PartitionSelector partitionSelector,
             RowWriter rowWriter,
             RowDataSerializer keySerializer,
-            @Nullable Sink<RowData, ?, ?, ?> kafka) {
+            @Nullable Sink<RowData, LogCommT, LogStateT, ?> logSink,
+            @Nullable DefaultLogTableFactory.OffsetsRetrieverFactory offsetsRetrieverFactory) {
         this.table = table;
         this.factory = factory;
         this.partitionSelector = partitionSelector;
         this.keySerializer = keySerializer;
         this.rowWriter = rowWriter;
-        this.kafka = kafka;
+        this.logSink = logSink;
+        this.offsetsRetrieverFactory = offsetsRetrieverFactory;
     }
 
     @Override
-    public SinkWriter<RowData, DynamicCommittable, Long> createWriter(
-            InitContext context, List<Long> states) throws IOException {
-        SinkWriter<RowData, ?, ?> kafkaWriter =
-                kafka == null ? null : kafka.createWriter(context, Collections.emptyList());
-        return new DynamicSinkWriter(table, factory, partitionSelector, rowWriter, kafkaWriter);
+    public DynamicSinkWriter<LogCommT, LogStateT> createWriter(
+            InitContext context, List<LogStateT> states) throws IOException {
+        SinkWriter<RowData, LogCommT, LogStateT> kafkaWriter =
+                logSink == null ? null : logSink.createWriter(context, states);
+        DefaultLogTableFactory.OffsetsRetriever offsetsRetriever =
+                offsetsRetrieverFactory == null ? null : offsetsRetrieverFactory.create();
+        return new DynamicSinkWriter<>(
+                table, factory, partitionSelector, rowWriter, kafkaWriter, offsetsRetriever);
     }
 
     @Override
-    public Optional<SimpleVersionedSerializer<Long>> getWriterStateSerializer() {
-        return Optional.of(new DynamicWriterStateSerializer());
+    public Optional<SimpleVersionedSerializer<LogStateT>> getWriterStateSerializer() {
+        return logSink == null ? Optional.empty() : logSink.getWriterStateSerializer();
     }
 
     @Override
-    public Optional<Committer<DynamicCommittable>> createCommitter() {
-        return Optional.empty();
+    public Optional<Committer<DynamicCommittable<LogCommT>>> createCommitter() throws IOException {
+        LocalCommitter<LogCommT> localCommitter = null;
+        if (logSink != null) {
+            Optional<Committer<LogCommT>> committer = logSink.createCommitter();
+            if (committer.isPresent()) {
+                localCommitter = new LocalCommitter<>(committer.get());
+            }
+        }
+        return Optional.ofNullable(localCommitter);
     }
 
     @Override
-    public Optional<SimpleVersionedSerializer<DynamicCommittable>> getCommittableSerializer() {
-        return Optional.of(new DynamicCommittableSerializer(keySerializer));
+    public Optional<SimpleVersionedSerializer<DynamicCommittable<LogCommT>>>
+            getCommittableSerializer() {
+        SimpleVersionedSerializer<LogCommT> logSerializer =
+                Optional.ofNullable(logSink)
+                        .map(Sink::getCommittableSerializer)
+                        .flatMap(o -> o)
+                        .orElse(null);
+        return Optional.of(new DynamicCommittableSerializer<>(keySerializer, logSerializer));
     }
 
     @Override
-    public Optional<GlobalCommitter<DynamicCommittable, DynamicCommittable>>
-            createGlobalCommitter() {
-        return Optional.of(new DynamicGlobalCommitter(table));
+    public Optional<GlobalCommitter<DynamicCommittable<LogCommT>, DynamicCommittable<LogCommT>>>
+            createGlobalCommitter() throws IOException {
+        if (logSink != null) {
+            if (logSink.createGlobalCommitter().isPresent()) {
+                throw new UnsupportedOperationException("Unsupported yet.");
+            }
+        }
+        return Optional.of(new DynamicGlobalCommitter<>(table));
     }
 
     @Override
-    public Optional<SimpleVersionedSerializer<DynamicCommittable>>
+    public Optional<SimpleVersionedSerializer<DynamicCommittable<LogCommT>>>
             getGlobalCommittableSerializer() {
         return getCommittableSerializer();
     }

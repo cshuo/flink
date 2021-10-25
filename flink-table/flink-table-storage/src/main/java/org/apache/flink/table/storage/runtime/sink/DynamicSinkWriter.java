@@ -20,11 +20,13 @@ package org.apache.flink.table.storage.runtime.sink;
 
 import org.apache.flink.api.connector.sink.SinkWriter;
 import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.factories.DefaultLogTableFactory.OffsetsRetriever;
 import org.apache.flink.table.storage.file.Table;
 import org.apache.flink.table.storage.file.lsm.FileStore;
 import org.apache.flink.table.storage.file.lsm.StoreException;
 import org.apache.flink.table.storage.file.lsm.sst.SstFileMeta;
 import org.apache.flink.table.storage.runtime.RowWriter;
+import org.apache.flink.util.Preconditions;
 
 import javax.annotation.Nullable;
 
@@ -36,13 +38,15 @@ import java.util.List;
 import java.util.Map;
 
 /** */
-public class DynamicSinkWriter implements SinkWriter<RowData, DynamicCommittable, Long> {
+public class DynamicSinkWriter<LogCommT, LogStateT>
+        implements SinkWriter<RowData, DynamicCommittable<LogCommT>, LogStateT> {
 
     private final Table table;
     private final FileStore.Factory factory;
     private final PartitionSelector partitionSelector;
     private final RowWriter rowWriter;
-    @Nullable private final SinkWriter<RowData, ?, ?> kafkaWriter;
+    @Nullable private final SinkWriter<RowData, LogCommT, LogStateT> logWriter;
+    @Nullable private final OffsetsRetriever offsetsRetriever;
 
     private final Map<String, Map<Integer, FileStore>> stores;
 
@@ -51,12 +55,14 @@ public class DynamicSinkWriter implements SinkWriter<RowData, DynamicCommittable
             FileStore.Factory factory,
             PartitionSelector partitionSelector,
             RowWriter rowWriter,
-            @Nullable SinkWriter<RowData, ?, ?> kafkaWriter) {
+            @Nullable SinkWriter<RowData, LogCommT, LogStateT> logWriter,
+            @Nullable OffsetsRetriever offsetsRetriever) {
         this.table = table;
         this.factory = factory;
         this.partitionSelector = partitionSelector;
         this.rowWriter = rowWriter;
-        this.kafkaWriter = kafkaWriter;
+        this.logWriter = logWriter;
+        this.offsetsRetriever = offsetsRetriever;
         this.stores = new HashMap<>();
     }
 
@@ -95,23 +101,27 @@ public class DynamicSinkWriter implements SinkWriter<RowData, DynamicCommittable
                 break;
         }
 
-        if (kafkaWriter != null) {
-            kafkaWriter.write(element, context);
+        if (logWriter != null) {
+            logWriter.write(element, context);
         }
     }
 
     @Override
-    public List<DynamicCommittable> prepareCommit(boolean flush) {
-        List<DynamicCommittable> committables = new ArrayList<>();
+    public List<DynamicCommittable<LogCommT>> prepareCommit(boolean flush)
+            throws IOException, InterruptedException {
+        List<DynamicCommittable<LogCommT>> committables = new ArrayList<>();
+        List<Integer> buckets = new ArrayList<>();
         for (String partition : stores.keySet()) {
             stores.computeIfPresent(
                     partition,
                     (p, pStores) -> {
                         for (Integer bucket : pStores.keySet()) {
+                            buckets.add(bucket);
                             pStores.computeIfPresent(
                                     bucket,
                                     (b, s) -> {
-                                        DynamicCommittable committable = snapshot(p, b, s);
+                                        DynamicCommittable<LogCommT> committable =
+                                                snapshot(p, b, s);
                                         if (committable != null) {
                                             committables.add(committable);
                                             return s;
@@ -124,10 +134,17 @@ public class DynamicSinkWriter implements SinkWriter<RowData, DynamicCommittable
                     });
         }
 
+        if (logWriter != null) {
+            Preconditions.checkNotNull(offsetsRetriever);
+            List<LogCommT> logCommittables = logWriter.prepareCommit(flush);
+            Map<Integer, Long> offsets = offsetsRetriever.endOffsets(buckets);
+            committables.add(new DynamicCommittable<>(logCommittables, offsets));
+        }
+
         return committables;
     }
 
-    private DynamicCommittable snapshot(String partition, int bucket, FileStore store) {
+    private DynamicCommittable<LogCommT> snapshot(String partition, int bucket, FileStore store) {
         List<SstFileMeta> addFiles = new ArrayList<>();
         List<SstFileMeta> deleteFiles = new ArrayList<>();
         store.snapshot(addFiles, deleteFiles);
@@ -135,19 +152,22 @@ public class DynamicSinkWriter implements SinkWriter<RowData, DynamicCommittable
             return null;
         }
 
-        return new DynamicCommittable(
+        return new DynamicCommittable<>(
                 partition, bucket, rowWriter.numBucket(), addFiles, deleteFiles);
     }
 
     @Override
-    public List<Long> snapshotState() throws IOException {
+    public List<LogStateT> snapshotState(long checkpointId) throws IOException {
+        if (logWriter != null) {
+            return logWriter.snapshotState(checkpointId);
+        }
         return Collections.emptyList();
     }
 
     @Override
     public void close() throws Exception {
-        if (kafkaWriter != null) {
-            kafkaWriter.close();
+        if (logWriter != null) {
+            logWriter.close();
         }
     }
 }

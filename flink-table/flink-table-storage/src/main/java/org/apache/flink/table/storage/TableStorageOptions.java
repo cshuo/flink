@@ -20,14 +20,26 @@ package org.apache.flink.table.storage;
 
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
+import org.apache.flink.configuration.DescribedEnum;
 import org.apache.flink.configuration.MemorySize;
+import org.apache.flink.configuration.description.InlineElement;
 
+import static org.apache.flink.configuration.description.TextElement.text;
 import static org.apache.flink.table.factories.FactoryUtil.FORMAT_SUFFIX;
 
 /** */
 public class TableStorageOptions {
 
     public static final String TABLE_STORAGE_PREFIX = "table-storage.";
+
+    public static final ConfigOption<Integer> BUCKET =
+            ConfigOptions.key("bucket")
+                    .intType()
+                    .defaultValue(1)
+                    .withDescription(
+                            "The bucket number of default dynamic table. "
+                                    + "The record is hashed into different buckets. "
+                                    + "The larger the bucket, the better the concurrent execution.");
 
     public static final ConfigOption<Boolean> CHANGE_TRACKING =
             ConfigOptions.key("change-tracking")
@@ -106,4 +118,43 @@ public class TableStorageOptions {
                     .booleanType()
                     .defaultValue(false)
                     .withDescription("");
+
+    public static final ConfigOption<LogScanStartupMode> LOG_SCAN_STARTUP_MODE =
+            ConfigOptions.key("log.scan.startup.mode")
+                    .enumType(LogScanStartupMode.class)
+                    .defaultValue(LogScanStartupMode.INITIAL)
+                    .withDescription("Startup mode for log consumer.");
+
+    /** Specifies the startup mode for log consumer. */
+    enum LogScanStartupMode implements DescribedEnum {
+        INITIAL(
+                "initial",
+                text(
+                        "Performs an initial snapshot on the table upon first startup,"
+                                + " and continue to read the latest changes.")),
+        LATEST_OFFSET(
+                "latest-offset",
+                text(
+                        "Never to perform snapshot on the table upon first startup,"
+                                + " just read from the end of the log which means only"
+                                + " have the changes since the connector was started."));
+
+        private final String value;
+        private final InlineElement description;
+
+        LogScanStartupMode(String value, InlineElement description) {
+            this.value = value;
+            this.description = description;
+        }
+
+        @Override
+        public String toString() {
+            return value;
+        }
+
+        @Override
+        public InlineElement getDescription() {
+            return description;
+        }
+    }
 }

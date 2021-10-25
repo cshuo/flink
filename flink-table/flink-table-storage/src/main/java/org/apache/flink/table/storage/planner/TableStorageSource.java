@@ -47,22 +47,22 @@ public class TableStorageSource extends TableStorageSourceSink
 
     private final DynamicTableFactory.Context context;
 
-    @Nullable private final DynamicTableSource kafkaSource;
+    @Nullable private final DynamicTableSource logTableSource;
 
     private List<Map<String, String>> remainingPartitions;
 
     public TableStorageSource(
             TableStorageFactory factory,
             DynamicTableFactory.Context context,
-            @Nullable DynamicTableSource kafkaSource) {
+            @Nullable DynamicTableSource logTableSource) {
         super(factory, context);
         this.context = context;
-        this.kafkaSource = kafkaSource;
+        this.logTableSource = logTableSource;
     }
 
     @Override
     public DynamicTableSource copy() {
-        TableStorageSource source = new TableStorageSource(factory, context, kafkaSource);
+        TableStorageSource source = new TableStorageSource(factory, context, logTableSource);
         source.remainingPartitions = remainingPartitions;
         return source;
     }
@@ -82,14 +82,14 @@ public class TableStorageSource extends TableStorageSourceSink
     @Override
     public ScanRuntimeProvider getScanRuntimeProvider(ScanContext sourceContext) {
         if (runtimeExecutionMode() == RuntimeExecutionMode.STREAMING) {
-            if (kafkaSource == null) {
+            if (logTableSource == null) {
                 throw new TableException("kafkaSource is null in streaming mode!");
             }
 
             if (remainingPartitions != null) {
                 // TODO how to to?
             }
-            return ((ScanTableSource) kafkaSource).getScanRuntimeProvider(sourceContext);
+            return ((ScanTableSource) logTableSource).getScanRuntimeProvider(sourceContext);
         } else {
             List<String> partitions =
                     context.getCatalogTable().isPartitioned() ? getOrFetchPartitions() : null;

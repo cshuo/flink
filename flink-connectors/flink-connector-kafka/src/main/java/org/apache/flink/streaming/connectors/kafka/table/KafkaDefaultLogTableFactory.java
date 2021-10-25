@@ -21,70 +21,67 @@ package org.apache.flink.streaming.connectors.kafka.table;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.connector.base.DeliveryGuarantee;
-import org.apache.flink.streaming.connectors.kafka.table.KafkaConnectorOptions.ScanStartupMode;
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.api.TableException;
 import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.ObjectIdentifier;
 import org.apache.flink.table.factories.DefaultLogTableFactory;
-import org.apache.flink.table.factories.listener.CreateTableListener;
-import org.apache.flink.table.factories.listener.DropTableListener;
-import org.apache.flink.table.factories.listener.TableNotification;
 import org.apache.flink.util.TimeUtils;
 
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.NewTopic;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.config.TopicConfig;
+
+import javax.annotation.Nullable;
 
 import java.time.Duration;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
 
 import static org.apache.flink.streaming.connectors.kafka.table.KafkaConnectorOptions.DELIVERY_GUARANTEE;
 import static org.apache.flink.streaming.connectors.kafka.table.KafkaConnectorOptions.KEY_FORMAT;
 import static org.apache.flink.streaming.connectors.kafka.table.KafkaConnectorOptions.SCAN_STARTUP_MODE;
+import static org.apache.flink.streaming.connectors.kafka.table.KafkaConnectorOptions.SCAN_STARTUP_SPECIFIC_OFFSETS;
 import static org.apache.flink.streaming.connectors.kafka.table.KafkaConnectorOptions.SINK_PARTITIONER;
 import static org.apache.flink.streaming.connectors.kafka.table.KafkaConnectorOptions.TOPIC;
 import static org.apache.flink.streaming.connectors.kafka.table.KafkaConnectorOptions.TRANSACTIONAL_ID_PREFIX;
 import static org.apache.flink.streaming.connectors.kafka.table.KafkaConnectorOptions.VALUE_FORMAT;
-import static org.apache.flink.table.factories.DefaultDynamicTableFactory.BUCKET;
 import static org.apache.flink.table.factories.FactoryUtil.CONNECTOR;
 import static org.apache.flink.table.factories.FactoryUtil.FORMAT;
 
 /** The Kafka {@link DefaultLogTableFactory} implementation. */
-public class KafkaDefaultLogTableFactory
-        implements DefaultLogTableFactory, CreateTableListener, DropTableListener {
+public class KafkaDefaultLogTableFactory implements DefaultLogTableFactory<Long> {
 
     public static final ConfigOption<Duration> RETENTION =
             ConfigOptions.key("retention").durationType().noDefaultValue().withDescription("");
 
     @Override
-    public Map<String, String> onTableCreation(TableNotification context) {
+    public Map<String, String> onTableCreation(Context context, int numBucket) {
         CatalogTable table = context.getCatalogTable();
-        Map<String, String> tableOptions = table.getOptions();
         Optional<Schema.UnresolvedPrimaryKey> primaryKey =
                 table.getUnresolvedSchema().getPrimaryKey();
 
         // 1. create topic
-        Map<String, String> logOptions = DefaultLogTableFactory.logOptions(tableOptions);
+        Map<String, String> options = table.getOptions();
         String topic = topic(context.getObjectIdentifier());
         Duration retention =
-                Optional.ofNullable(logOptions.get(RETENTION.key()))
+                Optional.ofNullable(options.get(RETENTION.key()))
                         .map(TimeUtils::parseDuration)
                         .orElse(null);
-        int bucket =
-                Integer.parseInt(
-                        tableOptions.getOrDefault(BUCKET.key(), BUCKET.defaultValue().toString()));
-        createTopic(logOptions, topic, bucket, retention, primaryKey.isPresent());
+        createTopic(options, topic, numBucket, retention, primaryKey.isPresent());
 
         // 2. create new table options
-        Map<String, String> newOptions = new HashMap<>(tableOptions);
+        Map<String, String> newOptions = new HashMap<>(options);
         if (primaryKey.isPresent()) {
             setIfAbsent(newOptions, CONNECTOR, UpsertKafkaDynamicTableFactory.IDENTIFIER);
             setIfAbsent(newOptions, KEY_FORMAT, "avro");
@@ -98,15 +95,9 @@ public class KafkaDefaultLogTableFactory
             setIfAbsent(newOptions, DELIVERY_GUARANTEE, DeliveryGuarantee.EXACTLY_ONCE.toString());
             // only one writer, we can set a unique value
             setIfAbsent(newOptions, TRANSACTIONAL_ID_PREFIX, "kafka-sink");
-
-            // partition for changes
-            setIfAbsent(
-                    newOptions, SINK_PARTITIONER, KafkaChangeLogSinkPartitioner.class.getName());
-
-            setIfAbsent(newOptions, SCAN_STARTUP_MODE, ScanStartupMode.EARLIEST_OFFSET.toString());
-
-            // TODO write key instead of SINK_PARTITIONER???
         }
+
+        newOptions.put(SINK_PARTITIONER.key(), KafkaChangeLogSinkPartitioner.class.getName());
 
         setIfAbsent(newOptions, TOPIC, topic);
 
@@ -114,16 +105,46 @@ public class KafkaDefaultLogTableFactory
     }
 
     @Override
-    public void onTableDrop(TableNotification context) {
-        Map<String, String> logOptions =
-                DefaultLogTableFactory.logOptions(context.getCatalogTable().getOptions());
-        deleteTopic(logOptions, topic(context.getObjectIdentifier()));
+    public void onTableDrop(Context context) {
+        Map<String, String> options = context.getCatalogTable().getOptions();
+        deleteTopic(options, options.get(TOPIC.key()));
+    }
+
+    @Override
+    public Map<String, String> onTableConsuming(
+            Context context, @Nullable Map<Integer, Long> bucketOffsets) {
+        Map<String, String> newOptions = new HashMap<>(context.getCatalogTable().getOptions());
+        if (bucketOffsets == null) {
+            newOptions.put(
+                    SCAN_STARTUP_MODE.key(),
+                    KafkaConnectorOptions.ScanStartupMode.LATEST_OFFSET.name());
+        } else {
+            newOptions.put(
+                    SCAN_STARTUP_MODE.key(),
+                    KafkaConnectorOptions.ScanStartupMode.SPECIFIC_OFFSETS.name());
+            newOptions.put(SCAN_STARTUP_SPECIFIC_OFFSETS.key(), toKafkaOffsetsValue(bucketOffsets));
+        }
+        return newOptions;
+    }
+
+    private String toKafkaOffsetsValue(Map<Integer, Long> bucketOffsets) {
+        return bucketOffsets.entrySet().stream()
+                .map(entry -> "partition:" + entry.getKey() + ",offset:" + entry.getValue())
+                .collect(Collectors.joining(";"));
+    }
+
+    @Override
+    public OffsetsRetrieverFactory createOffsetsRetrieverFactory(Context context) {
+        Properties properties =
+                KafkaConnectorOptionsUtil.getKafkaProperties(
+                        context.getCatalogTable().getOptions());
+        String topic = topic(context.getObjectIdentifier());
+        return new KafkaBucketOffsetsRetrieverFactory(properties, topic);
     }
 
     private void setIfAbsent(Map<String, String> options, ConfigOption<?> option, String value) {
-        String key = LOG_PREFIX + option.key();
-        if (!options.containsKey(key)) {
-            options.put(key, value);
+        if (!options.containsKey(option.key())) {
+            options.put(option.key(), value);
         }
     }
 
@@ -180,5 +201,32 @@ public class KafkaDefaultLogTableFactory
     @Override
     public Set<ConfigOption<?>> optionalOptions() {
         return new HashSet<>();
+    }
+
+    private static class KafkaBucketOffsetsRetrieverFactory implements OffsetsRetrieverFactory {
+
+        private final Properties properties;
+        private final String topic;
+
+        private KafkaBucketOffsetsRetrieverFactory(Properties properties, String topic) {
+            this.properties = properties;
+            this.topic = topic;
+        }
+
+        @Override
+        public OffsetsRetriever create() {
+            KafkaConsumer<?, ?> consumer = new KafkaConsumer<>(properties);
+            return buckets -> {
+                List<TopicPartition> partitions =
+                        buckets.stream()
+                                .map(bucket -> new TopicPartition(topic, bucket))
+                                .collect(Collectors.toList());
+                Map<TopicPartition, Long> partitionOffsets = consumer.endOffsets(partitions);
+                Map<Integer, Long> offsets = new HashMap<>();
+                partitionOffsets.forEach(
+                        (partition, offset) -> offsets.put(partition.partition(), offset));
+                return offsets;
+            };
+        }
     }
 }

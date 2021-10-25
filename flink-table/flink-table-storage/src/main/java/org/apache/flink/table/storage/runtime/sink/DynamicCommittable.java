@@ -23,19 +23,37 @@ import org.apache.flink.table.storage.file.manifest.FileKind;
 import org.apache.flink.table.storage.file.manifest.ManifestEntry;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /** */
-public class DynamicCommittable {
+public class DynamicCommittable<LogCommT> {
+
+    private final List<LogCommT> logCommittables;
+    private final Map<Integer, Long> logOffsets;
 
     private final List<ManifestEntry> entries;
 
     public DynamicCommittable() {
-        this.entries = new ArrayList<>();
+        this(new ArrayList<>());
+    }
+
+    public DynamicCommittable(
+            List<LogCommT> logCommittables,
+            Map<Integer, Long> logOffsets,
+            List<ManifestEntry> entries) {
+        this.logCommittables = logCommittables;
+        this.logOffsets = logOffsets;
+        this.entries = entries;
+    }
+
+    public DynamicCommittable(List<LogCommT> logCommittables, Map<Integer, Long> logOffsets) {
+        this(logCommittables, logOffsets, new ArrayList<>());
     }
 
     public DynamicCommittable(List<ManifestEntry> entries) {
-        this.entries = entries;
+        this(new ArrayList<>(), new HashMap<>(), entries);
     }
 
     public DynamicCommittable(
@@ -44,7 +62,16 @@ public class DynamicCommittable {
             int numBucket,
             List<SstFileMeta> addFiles,
             List<SstFileMeta> deleteFiles) {
-        this.entries = new ArrayList<>();
+        this(entries(partition, bucket, numBucket, addFiles, deleteFiles));
+    }
+
+    private static List<ManifestEntry> entries(
+            String partition,
+            int bucket,
+            int numBucket,
+            List<SstFileMeta> addFiles,
+            List<SstFileMeta> deleteFiles) {
+        List<ManifestEntry> entries = new ArrayList<>();
 
         // always delete files first, otherwise upgrade files will be ignored
         for (SstFileMeta file : deleteFiles) {
@@ -54,17 +81,39 @@ public class DynamicCommittable {
         for (SstFileMeta file : addFiles) {
             entries.add(new ManifestEntry(FileKind.ADD, partition, bucket, numBucket, file));
         }
+
+        return entries;
     }
 
-    public void merge(List<DynamicCommittable> committables) {
+    public void merge(List<DynamicCommittable<LogCommT>> committables) {
         committables.forEach(this::merge);
     }
 
-    public void merge(DynamicCommittable committable) {
+    public void merge(DynamicCommittable<LogCommT> committable) {
+        logCommittables.addAll(committable.logCommittables);
+        committable.logOffsets.forEach(
+                (bucket, offset) ->
+                        logOffsets.compute(
+                                bucket,
+                                (k, v) -> {
+                                    if (v != null) {
+                                        return Math.max(v, offset);
+                                    }
+                                    return offset;
+                                }));
+        logOffsets.putAll(committable.logOffsets);
         entries.addAll(committable.entries);
     }
 
     public List<ManifestEntry> getEntries() {
         return entries;
+    }
+
+    public List<LogCommT> getLogCommittables() {
+        return logCommittables;
+    }
+
+    public Map<Integer, Long> getLogOffsets() {
+        return logOffsets;
     }
 }

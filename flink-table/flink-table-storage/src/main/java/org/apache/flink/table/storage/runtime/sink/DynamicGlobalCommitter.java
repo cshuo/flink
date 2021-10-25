@@ -26,8 +26,8 @@ import java.util.Collections;
 import java.util.List;
 
 /** */
-public class DynamicGlobalCommitter
-        implements GlobalCommitter<DynamicCommittable, DynamicCommittable> {
+public class DynamicGlobalCommitter<LogCommT>
+        implements GlobalCommitter<DynamicCommittable<LogCommT>, DynamicCommittable<LogCommT>> {
 
     private final Table table;
 
@@ -36,26 +36,25 @@ public class DynamicGlobalCommitter
     }
 
     @Override
-    public List<DynamicCommittable> filterRecoveredCommittables(
-            List<DynamicCommittable> globalCommittables) {
-        // TODO filter committed.
+    public List<DynamicCommittable<LogCommT>> filterRecoveredCommittables(
+            List<DynamicCommittable<LogCommT>> globalCommittables) {
+        // TODO store checkpoint id in DynamicCommittable and filter committed.
         return globalCommittables;
     }
 
     @Override
-    public DynamicCommittable combine(List<DynamicCommittable> committables) {
-        DynamicCommittable committable = new DynamicCommittable();
+    public DynamicCommittable<LogCommT> combine(List<DynamicCommittable<LogCommT>> committables) {
+        DynamicCommittable<LogCommT> committable = new DynamicCommittable<>();
         committable.merge(committables);
         return committable;
     }
 
     @Override
-    public List<DynamicCommittable> commit(List<DynamicCommittable> globalCommittables)
-            throws IOException {
-        DynamicCommittable committable = new DynamicCommittable();
-        committable.merge(globalCommittables);
+    public List<DynamicCommittable<LogCommT>> commit(
+            List<DynamicCommittable<LogCommT>> globalCommittables) throws IOException {
+        DynamicCommittable<LogCommT> committable = combine(globalCommittables);
         if (!committable.getEntries().isEmpty()) {
-            table.commitChanges(committable.getEntries());
+            table.commitChanges(committable.getEntries(), committable.getLogOffsets());
             table.expire();
         }
         return Collections.emptyList();

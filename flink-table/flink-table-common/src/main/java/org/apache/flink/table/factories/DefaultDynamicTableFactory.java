@@ -19,8 +19,9 @@
 package org.apache.flink.table.factories;
 
 import org.apache.flink.annotation.Internal;
-import org.apache.flink.configuration.ConfigOption;
-import org.apache.flink.configuration.ConfigOptions;
+
+import java.io.Serializable;
+import java.util.Map;
 
 /**
  * Base interface for configuring a default dynamic table connector. The default table factory is
@@ -29,19 +30,20 @@ import org.apache.flink.configuration.ConfigOptions;
 @Internal
 public interface DefaultDynamicTableFactory extends DynamicTableFactory {
 
-    ConfigOption<Integer> BUCKET =
-            ConfigOptions.key("bucket")
-                    .intType()
-                    .defaultValue(1)
-                    .withDescription(
-                            "The bucket number of default dynamic table. "
-                                    + "The record is hashed into different buckets. "
-                                    + "The larger the bucket, the better the concurrent execution.");
-
     @Override
     default String factoryIdentifier() {
         return "_default";
     }
+
+    /**
+     * Notifies the listener that a table creation occurred.
+     *
+     * @return new options of this table.
+     */
+    Map<String, String> onTableCreation(Context context);
+
+    /** Notifies the listener that a table drop occurred. */
+    void onTableDrop(Context context);
 
     /**
      * Discovers the unique implementation of {@link DefaultDynamicTableFactory} without identifier.
@@ -52,7 +54,9 @@ public interface DefaultDynamicTableFactory extends DynamicTableFactory {
     }
 
     /** Discovers the unique implementation of {@link DefaultLogTableFactory} without identifier. */
-    static DefaultLogTableFactory discoverDefaultLogFactory(ClassLoader classLoader) {
+    static <OFFSET extends Serializable> DefaultLogTableFactory<OFFSET> discoverDefaultLogFactory(
+            ClassLoader classLoader) {
+        //noinspection unchecked
         return FactoryUtil.discoverUniqueImplTableFactory(
                 DefaultLogTableFactory.class, classLoader);
     }

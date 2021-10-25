@@ -26,12 +26,15 @@ import org.apache.flink.table.connector.sink.SinkProvider;
 import org.apache.flink.table.connector.sink.abilities.SupportsOverwrite;
 import org.apache.flink.table.connector.sink.abilities.SupportsPartitioning;
 import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.factories.DefaultLogTableFactory.OffsetsRetrieverFactory;
 import org.apache.flink.table.factories.DynamicTableFactory;
 import org.apache.flink.table.filesystem.FileSystemConnectorOptions;
 import org.apache.flink.table.storage.runtime.RowWriter;
 import org.apache.flink.table.storage.runtime.sink.BucketKeySelector;
 import org.apache.flink.table.storage.runtime.sink.DynamicSink;
 import org.apache.flink.table.storage.runtime.sink.PartitionSelector;
+
+import javax.annotation.Nullable;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -40,7 +43,8 @@ import java.util.Map;
 public class TableStorageSink extends TableStorageSourceSink
         implements DynamicTableSink, SupportsPartitioning, SupportsOverwrite {
 
-    private final DynamicTableSink kafkaSink;
+    @Nullable private final DynamicTableSink logTableSink;
+    @Nullable private final OffsetsRetrieverFactory offsetsRetrieverFactory;
 
     private boolean overwrite;
     private LinkedHashMap<String, String> staticPartition;
@@ -48,9 +52,11 @@ public class TableStorageSink extends TableStorageSourceSink
     public TableStorageSink(
             TableStorageFactory factory,
             DynamicTableFactory.Context context,
-            DynamicTableSink kafkaSink) {
+            @Nullable DynamicTableSink logTableSink,
+            @Nullable OffsetsRetrieverFactory offsetsRetrieverFactory) {
         super(factory, context);
-        this.kafkaSink = kafkaSink;
+        this.logTableSink = logTableSink;
+        this.offsetsRetrieverFactory = offsetsRetrieverFactory;
     }
 
     @Override
@@ -60,10 +66,10 @@ public class TableStorageSink extends TableStorageSourceSink
 
     @Override
     public SinkRuntimeProvider getSinkRuntimeProvider(Context sinkContext) {
-        Sink<RowData, ?, ?, ?> kafka =
-                kafkaSink == null
+        Sink<RowData, ?, ?, ?> logSink =
+                logTableSink == null
                         ? null
-                        : ((SinkProvider) kafkaSink.getSinkRuntimeProvider(sinkContext))
+                        : ((SinkProvider) logTableSink.getSinkRuntimeProvider(sinkContext))
                                 .createSink();
 
         if (overwrite) {
@@ -81,7 +87,8 @@ public class TableStorageSink extends TableStorageSourceSink
                                 FileSystemConnectorOptions.PARTITION_DEFAULT_NAME.defaultValue()),
                         rowWriter,
                         processor.keySerializer(),
-                        kafka);
+                        logSink,
+                        offsetsRetrieverFactory);
 
         return (DataStreamSinkProvider)
                 dataStream -> dataStream.keyBy(new BucketKeySelector(rowWriter)).sinkTo(sink);
@@ -89,7 +96,8 @@ public class TableStorageSink extends TableStorageSourceSink
 
     @Override
     public DynamicTableSink copy() {
-        TableStorageSink sink = new TableStorageSink(factory, context, kafkaSink);
+        TableStorageSink sink =
+                new TableStorageSink(factory, context, logTableSink, offsetsRetrieverFactory);
         sink.overwrite = overwrite;
         sink.staticPartition = staticPartition;
         return sink;
