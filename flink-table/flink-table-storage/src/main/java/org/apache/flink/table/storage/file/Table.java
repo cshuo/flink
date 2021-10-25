@@ -31,10 +31,12 @@ import org.apache.flink.table.storage.file.manifest.ManifestFileMeta;
 import org.apache.flink.table.storage.file.manifest.ManifestFileReader;
 import org.apache.flink.table.storage.file.manifest.ManifestFileWriter;
 import org.apache.flink.table.storage.file.manifest.ManifestMerge;
+import org.apache.flink.table.storage.file.manifest.ManifestsFileReader;
+import org.apache.flink.table.storage.file.manifest.ManifestsFileWriter;
 import org.apache.flink.table.storage.file.snapshot.Snapshot;
 import org.apache.flink.table.storage.file.snapshot.SnapshotExpire;
-import org.apache.flink.table.storage.file.snapshot.SnapshotFileReader;
-import org.apache.flink.table.storage.file.snapshot.SnapshotFileWriter;
+import org.apache.flink.table.storage.file.utils.FileFactory;
+import org.apache.flink.table.storage.file.utils.FileUtils;
 
 import java.io.IOException;
 import java.io.Serializable;
@@ -65,8 +67,9 @@ public class Table implements Serializable {
     private final Path basePath;
     private final ManifestFileWriter manifestWriter;
     private final ManifestFileReader manifestReader;
-    private final SnapshotFileWriter snapshotWriter;
-    private final SnapshotFileReader snapshotReader;
+    private final ManifestsFileWriter manifestsWriter;
+    private final ManifestsFileReader manifestsReader;
+    private final FileFactory snapshotFileFactory;
 
     private transient List<Snapshot> snapshots;
 
@@ -77,16 +80,18 @@ public class Table implements Serializable {
             Path basePath,
             ManifestFileWriter manifestWriter,
             ManifestFileReader manifestReader,
-            SnapshotFileWriter snapshotWriter,
-            SnapshotFileReader snapshotReader) {
+            ManifestsFileWriter manifestsWriter,
+            ManifestsFileReader manifestsReader,
+            FileFactory snapshotFileFactory) {
         this.snapshotExpireTrigger = snapshotExpireTrigger;
         this.snapshotRetained = snapshotRetained;
         this.maxManifestFileSize = maxManifestFileSize;
         this.basePath = basePath;
         this.manifestWriter = manifestWriter;
         this.manifestReader = manifestReader;
-        this.snapshotWriter = snapshotWriter;
-        this.snapshotReader = snapshotReader;
+        this.manifestsWriter = manifestsWriter;
+        this.manifestsReader = manifestsReader;
+        this.snapshotFileFactory = snapshotFileFactory;
     }
 
     public Path path() {
@@ -181,7 +186,7 @@ public class Table implements Serializable {
 
     public List<ManifestFileMeta> manifestsOfSnapshot(Snapshot snapshot) {
         try {
-            return snapshotReader.read(snapshotPath(basePath, snapshot.fileName()));
+            return manifestsReader.read(manifestPath(basePath, snapshot.getManifestsFile()));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -194,7 +199,7 @@ public class Table implements Serializable {
         }
 
         List<ManifestFileMeta> manifests =
-                snapshotReader.read(snapshotPath(basePath, snapshot.fileName()));
+                manifestsReader.read(manifestPath(basePath, snapshot.getManifestsFile()));
         return manifests
                 .parallelStream()
                 .flatMap(e -> filesOfManifest(e).stream().parallel())
@@ -218,7 +223,11 @@ public class Table implements Serializable {
                                     if (snapshotId == null) {
                                         return null;
                                     } else {
-                                        return new Snapshot(snapshotId, file.getModificationTime());
+                                        try {
+                                            return readSnapshotFile(snapshotId);
+                                        } catch (IOException e) {
+                                            throw new UncheckedIOException(e);
+                                        }
                                     }
                                 })
                         .filter(Objects::nonNull)
@@ -242,7 +251,7 @@ public class Table implements Serializable {
         List<ManifestFileMeta> lastManifests =
                 last == null
                         ? Collections.emptyList()
-                        : snapshotReader.read(snapshotPath(basePath, last.fileName()));
+                        : manifestsReader.read(manifestPath(basePath, last.getManifestsFile()));
         ManifestFileMeta newManifest = writeManifestFile(newFiles);
         List<ManifestFileMeta> manifests = new ArrayList<>(lastManifests);
         manifests.add(newManifest);
@@ -257,29 +266,42 @@ public class Table implements Serializable {
         }
 
         // 3. write snapshot file and commit
-        String snapshotFile = snapshotWriter.write(merged);
+        Path manifestsFile = manifestsWriter.write(merged);
+        Snapshot snapshot =
+                new Snapshot(
+                        snapshotId,
+                        manifestsFile.getName(),
+                        System.currentTimeMillis(),
+                        logOffsets,
+                        new HashMap<>());
 
-        Path src = snapshotPath(basePath, snapshotFile);
+        Path tmp = writeSnapshotFile(snapshot);
         Path dst = snapshotPath(basePath, snapshotId);
 
-        FileSystem fileSystem = src.getFileSystem();
+        FileSystem fileSystem = tmp.getFileSystem();
         // TODO rename only works in HDFS...
-        if (!fileSystem.rename(src, dst)) {
-            fileSystem.delete(src, true);
-
+        if (!fileSystem.rename(tmp, dst)) {
             // failed. we need to clear new files
+            fileSystem.delete(tmp, true);
+            fileSystem.delete(manifestsFile, true);
             for (ManifestFileMeta manifest : newManifests) {
                 new SnapshotExpire(this).deleteManifest(manifest);
             }
             return false;
         } else {
-            snapshots()
-                    .add(
-                            new Snapshot(
-                                    snapshotId,
-                                    fileSystem.getFileStatus(dst).getModificationTime()));
+            snapshots().add(snapshot);
             return true;
         }
+    }
+
+    private Snapshot readSnapshotFile(long id) throws IOException {
+        return Snapshot.fromJson(FileUtils.readFileUtf8(snapshotPath(basePath, id)));
+    }
+
+    private Path writeSnapshotFile(Snapshot snapshot) throws IOException {
+        Path file = snapshotFileFactory.newFile();
+        FileUtils.writeFileUtf8(file, snapshot.toJson());
+        return file;
     }
 
     public ManifestFileMeta writeManifestFile(List<ManifestEntry> files) throws IOException {

@@ -60,8 +60,8 @@ public class TableStorageFormats implements Serializable {
     private final BulkWriter.Factory<RowData> manifestWriter;
     private final BulkFormat<RowData, FileSourceSplit> manifestReader;
 
-    private final BulkWriter.Factory<RowData> snapshotWriter;
-    private final BulkFormat<RowData, FileSourceSplit> snapshotReader;
+    private final BulkWriter.Factory<RowData> manifestsWriter;
+    private final BulkFormat<RowData, FileSourceSplit> manifestsReader;
 
     public TableStorageFormats(
             TableStorageFactory factory,
@@ -93,16 +93,16 @@ public class TableStorageFormats implements Serializable {
                         .discoverDecodingFormat(BulkReaderFormatFactory.class, FILE_META_FORMAT)
                         .createRuntimeDecoder(sourceContext, fromLogicalToDataType(manifestType));
 
-        RowType snapshotType = ManifestFileMeta.schema();
-        DynamicTableFactory.Context snapshotContext = newContext(context, snapshotType);
-        this.snapshotWriter =
+        RowType manifestsType = ManifestFileMeta.schema();
+        DynamicTableFactory.Context snapshotContext = newContext(context, manifestsType);
+        this.manifestsWriter =
                 createTableFactoryHelper(factory, snapshotContext)
                         .discoverEncodingFormat(BulkWriterFormatFactory.class, FILE_META_FORMAT)
-                        .createRuntimeEncoder(sinkContext, fromLogicalToDataType(snapshotType));
-        this.snapshotReader =
+                        .createRuntimeEncoder(sinkContext, fromLogicalToDataType(manifestsType));
+        this.manifestsReader =
                 createTableFactoryHelper(factory, snapshotContext)
                         .discoverDecodingFormat(BulkReaderFormatFactory.class, FILE_META_FORMAT)
-                        .createRuntimeDecoder(sourceContext, fromLogicalToDataType(snapshotType));
+                        .createRuntimeDecoder(sourceContext, fromLogicalToDataType(manifestsType));
     }
 
     private DynamicTableFactory.Context newContext(
@@ -192,11 +192,11 @@ public class TableStorageFormats implements Serializable {
         return manifestReader;
     }
 
-    public BulkWriter.Factory<RowData> getSnapshotWriter() {
-        return snapshotWriter;
+    public BulkWriter.Factory<RowData> getManifestsWriter() {
+        return manifestsWriter;
     }
 
-    public BulkFormat<RowData, FileSourceSplit> getSnapshotReader() {
-        return snapshotReader;
+    public BulkFormat<RowData, FileSourceSplit> getManifestsReader() {
+        return manifestsReader;
     }
 }

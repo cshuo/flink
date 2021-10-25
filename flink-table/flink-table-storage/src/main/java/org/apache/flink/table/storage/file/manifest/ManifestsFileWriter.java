@@ -16,14 +16,13 @@
  * limitations under the License.
  */
 
-package org.apache.flink.table.storage.file.snapshot;
+package org.apache.flink.table.storage.file.manifest;
 
 import org.apache.flink.api.common.serialization.BulkWriter;
 import org.apache.flink.core.fs.FSDataOutputStream;
 import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.table.data.RowData;
-import org.apache.flink.table.storage.file.manifest.ManifestFileMeta;
 import org.apache.flink.table.storage.file.utils.FileFactory;
 
 import java.io.IOException;
@@ -31,17 +30,17 @@ import java.io.Serializable;
 import java.util.List;
 
 /** */
-public class SnapshotFileWriter implements Serializable {
+public class ManifestsFileWriter implements Serializable {
 
     private final BulkWriter.Factory<RowData> writerFactory;
     private final FileFactory fileFactory;
 
-    public SnapshotFileWriter(BulkWriter.Factory<RowData> writerFactory, FileFactory fileFactory) {
+    public ManifestsFileWriter(BulkWriter.Factory<RowData> writerFactory, FileFactory fileFactory) {
         this.writerFactory = writerFactory;
         this.fileFactory = fileFactory;
     }
 
-    public String write(List<ManifestFileMeta> orderedEntries) throws IOException {
+    public Path write(List<ManifestFileMeta> orderedEntries) throws IOException {
         Path file = fileFactory.newFile();
         FSDataOutputStream out =
                 file.getFileSystem().create(file, FileSystem.WriteMode.NO_OVERWRITE);
@@ -53,6 +52,6 @@ public class SnapshotFileWriter implements Serializable {
 
         writer.finish();
 
-        return file.getName();
+        return file;
     }
 }

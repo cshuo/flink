@@ -54,11 +54,7 @@ public class FileFactory implements Serializable {
         return new Path(new Path(basePath, MANIFEST_DIR), name);
     }
 
-    public static Path snapshotPath(Path basePath, String name) {
-        return new Path(new Path(basePath, SNAPSHOT_DIR), name);
-    }
-
     public static Path snapshotPath(Path basePath, long snapshotId) {
-        return snapshotPath(basePath, Snapshot.fileName(snapshotId));
+        return new Path(new Path(basePath, SNAPSHOT_DIR), Snapshot.fileName(snapshotId));
     }
 }

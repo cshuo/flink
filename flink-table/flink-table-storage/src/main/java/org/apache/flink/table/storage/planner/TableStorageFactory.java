@@ -142,7 +142,8 @@ public class TableStorageFactory
                             newOptions.getOrDefault(
                                     BUCKET.key(), BUCKET.defaultValue().toString()));
             Map<String, String> newLogOptions =
-                    logFactory.onTableCreation(copyContext(context, newOptions), numBucket);
+                    logFactory.onTableCreation(
+                            copyContext(context, logOptions(newOptions)), numBucket);
             newLogOptions.forEach((k, v) -> newOptions.put(LOG_OPTION_PREFIX + k, v));
         }
 
@@ -181,7 +182,6 @@ public class TableStorageFactory
     private Optional<OffsetsRetrieverFactory> createOffsetsRetrieverFactory(Context context) {
         Map<String, String> tableOptions = context.getCatalogTable().getOptions();
         if (changeTracking(tableOptions)) {
-            Map<String, String> logOptions = logOptions(tableOptions);
             DefaultLogTableFactory<Serializable> logTableFactory =
                     DefaultDynamicTableFactory.discoverDefaultLogFactory(context.getClassLoader());
             return Optional.of(

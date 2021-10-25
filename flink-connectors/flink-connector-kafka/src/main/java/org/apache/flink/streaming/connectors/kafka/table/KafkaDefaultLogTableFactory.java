@@ -30,9 +30,11 @@ import org.apache.flink.util.TimeUtils;
 
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.NewTopic;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.config.TopicConfig;
+import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 
 import javax.annotation.Nullable;
 
@@ -95,9 +97,11 @@ public class KafkaDefaultLogTableFactory implements DefaultLogTableFactory<Long>
             setIfAbsent(newOptions, DELIVERY_GUARANTEE, DeliveryGuarantee.EXACTLY_ONCE.toString());
             // only one writer, we can set a unique value
             setIfAbsent(newOptions, TRANSACTIONAL_ID_PREFIX, "kafka-sink");
-        }
 
-        newOptions.put(SINK_PARTITIONER.key(), KafkaChangeLogSinkPartitioner.class.getName());
+            // TODO set correct partitioner
+            // TODO set to upsert kafka too
+            newOptions.put(SINK_PARTITIONER.key(), KafkaChangeLogSinkPartitioner.class.getName());
+        }
 
         setIfAbsent(newOptions, TOPIC, topic);
 
@@ -215,6 +219,12 @@ public class KafkaDefaultLogTableFactory implements DefaultLogTableFactory<Long>
 
         @Override
         public OffsetsRetriever create() {
+            properties.setProperty(
+                    ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
+                    ByteArrayDeserializer.class.getName());
+            properties.setProperty(
+                    ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
+                    ByteArrayDeserializer.class.getName());
             KafkaConsumer<?, ?> consumer = new KafkaConsumer<>(properties);
             return buckets -> {
                 List<TopicPartition> partitions =

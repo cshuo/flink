@@ -18,9 +18,16 @@
 
 package org.apache.flink.table.storage.file.utils;
 
+import org.apache.flink.core.fs.FSDataInputStream;
+import org.apache.flink.core.fs.FSDataOutputStream;
+import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.core.fs.Path;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
 
 /** */
 public final class FileUtils {
@@ -28,5 +35,27 @@ public final class FileUtils {
 
     public static long fileSize(Path file) throws IOException {
         return file.getFileSystem().getFileStatus(file).getLen();
+    }
+
+    public static String readFileUtf8(Path file) throws IOException {
+        try (FSDataInputStream in = file.getFileSystem().open(file); ) {
+            BufferedReader reader =
+                    new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
+            StringBuilder builder = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                builder.append(line);
+            }
+            return builder.toString();
+        }
+    }
+
+    public static void writeFileUtf8(Path file, String content) throws IOException {
+        try (FSDataOutputStream out =
+                file.getFileSystem().create(file, FileSystem.WriteMode.NO_OVERWRITE); ) {
+            OutputStreamWriter writer = new OutputStreamWriter(out, StandardCharsets.UTF_8);
+            writer.write(content);
+            writer.flush();
+        }
     }
 }

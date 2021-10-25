@@ -33,8 +33,8 @@ import org.apache.flink.table.storage.file.lsm.FileStore;
 import org.apache.flink.table.storage.file.lsm.StoreOptions;
 import org.apache.flink.table.storage.file.manifest.ManifestFileReader;
 import org.apache.flink.table.storage.file.manifest.ManifestFileWriter;
-import org.apache.flink.table.storage.file.snapshot.SnapshotFileReader;
-import org.apache.flink.table.storage.file.snapshot.SnapshotFileWriter;
+import org.apache.flink.table.storage.file.manifest.ManifestsFileReader;
+import org.apache.flink.table.storage.file.manifest.ManifestsFileWriter;
 import org.apache.flink.table.storage.file.utils.FileFactory;
 import org.apache.flink.table.storage.runtime.Processor;
 import org.apache.flink.table.types.logical.RowType;
@@ -137,12 +137,16 @@ public abstract class TableStorageSourceSink {
                         "manifest",
                         uuid,
                         options.get(FILE_META_FORMAT));
-        FileFactory snapshotName =
+
+        FileFactory manifestsName =
                 new FileFactory(
-                        new Path(tablePath, "snapshot"),
-                        "snapshot",
+                        new Path(tablePath, "manifest"),
+                        "manifests",
                         uuid,
                         options.get(FILE_META_FORMAT));
+
+        FileFactory snapshotName =
+                new FileFactory(new Path(tablePath, "snapshot"), "snapshot", uuid, "json");
 
         table =
                 new Table(
@@ -155,8 +159,9 @@ public abstract class TableStorageSourceSink {
                                 formats.getManifestReader(),
                                 processor.keySerializer().getArity(),
                                 processor.keySerializer()),
-                        new SnapshotFileWriter(formats.getSnapshotWriter(), snapshotName),
-                        new SnapshotFileReader(formats.getSnapshotReader()));
+                        new ManifestsFileWriter(formats.getManifestsWriter(), manifestsName),
+                        new ManifestsFileReader(formats.getManifestsReader()),
+                        snapshotName);
 
         storeFactory =
                 new FileStoreFactory(

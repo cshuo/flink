@@ -21,10 +21,10 @@ package org.apache.flink.table.storage.runtime.sink;
 import org.apache.flink.api.connector.sink.Committer;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /** */
 public class LocalCommitter<LogCommT> implements Committer<DynamicCommittable<LogCommT>> {
@@ -39,12 +39,18 @@ public class LocalCommitter<LogCommT> implements Committer<DynamicCommittable<Lo
     public List<DynamicCommittable<LogCommT>> commit(
             List<DynamicCommittable<LogCommT>> committables)
             throws IOException, InterruptedException {
-        List<LogCommT> ret =
-                logCommitter.commit(
-                        committables.stream()
-                                .flatMap(c -> c.getLogCommittables().stream())
-                                .collect(Collectors.toList()));
-        return Collections.singletonList(new DynamicCommittable<>(ret, new HashMap<>()));
+        List<LogCommT> logCommittables = new ArrayList<>();
+        for (DynamicCommittable<LogCommT> committable : committables) {
+            logCommittables.addAll(committable.getLogCommittables());
+        }
+        if (!logCommittables.isEmpty()) {
+            List<LogCommT> ret = logCommitter.commit(logCommittables);
+            if (!ret.isEmpty()) {
+                return Collections.singletonList(new DynamicCommittable<>(ret, new HashMap<>()));
+            }
+        }
+
+        return Collections.emptyList();
     }
 
     @Override

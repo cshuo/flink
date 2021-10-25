@@ -18,27 +18,86 @@
 
 package org.apache.flink.table.storage.file.snapshot;
 
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
+
+import java.util.Map;
+
 /** */
 public class Snapshot {
 
     public static final String FILE_PREFIX = "SNAPSHOT-";
 
-    private final long id;
+    private long id;
 
-    private final long timestampMills;
+    private String manifestsFile;
 
-    public Snapshot(long id, long timestampMills) {
+    private long timestampMills;
+
+    private Map<Integer, Long> logOffsets;
+
+    private Map<String, String> properties;
+
+    public Snapshot() {}
+
+    public Snapshot(
+            long id,
+            String manifestsFile,
+            long timestampMills,
+            Map<Integer, Long> logOffsets,
+            Map<String, String> properties) {
         this.id = id;
+        this.manifestsFile = manifestsFile;
         this.timestampMills = timestampMills;
+        this.logOffsets = logOffsets;
+        this.properties = properties;
     }
+
+    // --------------- GETTERS ---------------
 
     public long getId() {
         return id;
     }
 
+    public String getManifestsFile() {
+        return manifestsFile;
+    }
+
     public long getTimestampMills() {
         return timestampMills;
     }
+
+    public Map<Integer, Long> getLogOffsets() {
+        return logOffsets;
+    }
+
+    public Map<String, String> getProperties() {
+        return properties;
+    }
+
+    // --------------- SETTERS ---------------
+
+    public void setId(long id) {
+        this.id = id;
+    }
+
+    public void setManifestsFile(String manifestsFile) {
+        this.manifestsFile = manifestsFile;
+    }
+
+    public void setTimestampMills(long timestampMills) {
+        this.timestampMills = timestampMills;
+    }
+
+    public void setLogOffsets(Map<Integer, Long> logOffsets) {
+        this.logOffsets = logOffsets;
+    }
+
+    public void setProperties(Map<String, String> properties) {
+        this.properties = properties;
+    }
+
+    // --------------- HELPERS ---------------
 
     public String fileName() {
         return fileName(id);
@@ -56,5 +115,21 @@ public class Snapshot {
             }
         }
         return null;
+    }
+
+    public String toJson() {
+        try {
+            return new ObjectMapper().writeValueAsString(this);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static Snapshot fromJson(String json) {
+        try {
+            return new ObjectMapper().readValue(json, Snapshot.class);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

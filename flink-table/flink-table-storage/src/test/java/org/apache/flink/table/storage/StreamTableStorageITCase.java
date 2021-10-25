@@ -20,12 +20,13 @@ package org.apache.flink.table.storage;
 
 import org.apache.flink.api.common.RuntimeExecutionMode;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.CheckpointingMode;
+import org.apache.flink.streaming.connectors.kafka.table.KafkaTableTestBase;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.config.ExecutionConfigOptions;
-import org.apache.flink.table.planner.runtime.utils.StreamingTestBase;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
@@ -45,66 +46,56 @@ import java.util.concurrent.TimeoutException;
 import static org.apache.flink.configuration.ExecutionOptions.RUNTIME_MODE;
 
 /** */
-public class StreamTableStorageITCase extends StreamingTestBase {
+public class StreamTableStorageITCase extends KafkaTableTestBase {
 
     private TableEnvironment batchEnv;
 
     @Before
     public void before() {
-        super.before();
         URI folder;
         try {
             folder = TEMPORARY_FOLDER.newFolder().toURI();
-            System.out.println(folder);
+            System.out.println(folder.getPath());
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
-        tEnv().getConfig()
-                .getConfiguration()
-                .setString("table-storage.file.root-path", folder.toString());
-        tEnv().getConfig().getConfiguration().setString("table-storage.change-tracking", "false");
-        tEnv().getConfig()
-                .getConfiguration()
-                .setString("table-storage.file.target-file-size", "200 k");
-        tEnv().getConfig()
-                .getConfiguration()
-                .setString("table-storage.file.min-file-size", "200 k");
-        env().enableCheckpointing(1000, CheckpointingMode.EXACTLY_ONCE);
-        env().setRestartStrategy(RestartStrategies.fixedDelayRestart(1, 0));
+        Configuration configuration = tEnv.getConfig().getConfiguration();
+        configuration.setString("table-storage.file.root-path", folder.toString());
+        configuration.setString("table-storage.file.target-file-size", "200 k");
+        configuration.setString("table-storage.file.min-file-size", "200 k");
+        configuration.setString(
+                "table-storage.log.properties.bootstrap.servers", getBootstrapServers());
+        env.enableCheckpointing(1000, CheckpointingMode.EXACTLY_ONCE);
+        env.setRestartStrategy(RestartStrategies.fixedDelayRestart(1, 0));
         // run both stream and batch
-        tEnv().getConfig()
-                .getConfiguration()
-                .set(ExecutionConfigOptions.TABLE_EXEC_RESOURCE_DEFAULT_PARALLELISM, 1);
-        tEnv().executeSql(
-                        "CREATE TABLE src (t TIMESTAMP_LTZ(3), a INT, b INT) WITH (\n"
-                                + "'connector' = 'datagen',\n"
-                                + "'rows-per-second' = '4000',\n"
-                                + "'fields.a.kind' = 'sequence',\n"
-                                + "'fields.a.start' = '10000',\n"
-                                + "'fields.a.end' = '70000',\n"
-                                + "'number-of-rows' = '100000'"
-                                + ")");
+        configuration.set(ExecutionConfigOptions.TABLE_EXEC_RESOURCE_DEFAULT_PARALLELISM, 1);
+        tEnv.executeSql(
+                "CREATE TABLE src (t TIMESTAMP_LTZ(3), a INT, b INT) WITH (\n"
+                        + "'connector' = 'datagen',\n"
+                        + "'rows-per-second' = '4000',\n"
+                        + "'fields.a.kind' = 'sequence',\n"
+                        + "'fields.a.start' = '10000',\n"
+                        + "'fields.a.end' = '70000',\n"
+                        + "'number-of-rows' = '100000'"
+                        + ")");
         batchEnv = TableEnvironment.create(EnvironmentSettings.inBatchMode());
-        batchEnv.getConfig().addConfiguration(tEnv().getConfig().getConfiguration());
+        batchEnv.registerCatalog("table-storage", tEnv.getCatalog(tEnv.getCurrentCatalog()).get());
+        batchEnv.useCatalog("table-storage");
+        batchEnv.getConfig().addConfiguration(configuration);
         batchEnv.getConfig().getConfiguration().set(RUNTIME_MODE, RuntimeExecutionMode.BATCH);
     }
 
     @After
     public void after() {
         super.after();
-        tEnv().executeSql("DROP TABLE t");
-    }
-
-    private void createTable(String ddl) {
-        tEnv().executeSql(ddl);
-        batchEnv.executeSql(ddl);
+        tEnv.executeSql("DROP TABLE t");
     }
 
     @Test
     public void testSequenceWithPk() throws Exception {
-        createTable("CREATE TABLE t (a INT, b BIGINT, PRIMARY KEY(a) NOT ENFORCED)");
+        tEnv.executeSql("CREATE TABLE t (a INT, b BIGINT, PRIMARY KEY(a) NOT ENFORCED)");
 
-        TableResult result = tEnv().executeSql("INSERT INTO t SELECT a, b FROM src");
+        TableResult result = tEnv.executeSql("INSERT INTO t SELECT a, b FROM src");
 
         while (true) {
             try {
@@ -153,9 +144,9 @@ public class StreamTableStorageITCase extends StreamingTestBase {
 
     @Test
     public void testRandomPk() throws Exception {
-        createTable("CREATE TABLE t (a INT, b BIGINT, PRIMARY KEY(b) NOT ENFORCED)");
+        tEnv.executeSql("CREATE TABLE t (a INT, b BIGINT, PRIMARY KEY(b) NOT ENFORCED)");
 
-        TableResult result = tEnv().executeSql("INSERT INTO t SELECT a, b FROM src");
+        TableResult result = tEnv.executeSql("INSERT INTO t SELECT a, b FROM src");
 
         while (true) {
             try {
@@ -195,10 +186,10 @@ public class StreamTableStorageITCase extends StreamingTestBase {
 
     @Test
     public void testSequenceBoundedWithPk() throws Exception {
-        createTable("CREATE TABLE t (a INT, b BIGINT, PRIMARY KEY(a) NOT ENFORCED)");
+        tEnv.executeSql("CREATE TABLE t (a INT, b BIGINT, PRIMARY KEY(a) NOT ENFORCED)");
 
         TableResult result =
-                tEnv().executeSql("INSERT INTO t SELECT mod(a, 1000) + 10000, b FROM src");
+                tEnv.executeSql("INSERT INTO t SELECT mod(a, 1000) + 10000, b FROM src");
 
         while (true) {
             try {

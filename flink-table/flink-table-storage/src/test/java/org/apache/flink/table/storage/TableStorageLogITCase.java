@@ -19,6 +19,7 @@
 package org.apache.flink.table.storage;
 
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.connectors.kafka.table.KafkaTableTestBase;
 import org.apache.flink.types.Row;
 
@@ -28,6 +29,7 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
+import java.net.URI;
 import java.util.Arrays;
 import java.util.List;
 
@@ -43,10 +45,13 @@ public class TableStorageLogITCase extends KafkaTableTestBase {
     @Before
     public void before() throws IOException {
         Configuration configuration = tEnv.getConfig().getConfiguration();
-        configuration.setString(
-                "table-storage.file.root-path", TEMPORARY_FOLDER.newFolder().toURI().toString());
+        URI folder = TEMPORARY_FOLDER.newFolder().toURI();
+        System.out.println(folder.getPath());
+        configuration.setString("table-storage.file.root-path", folder.toString());
         configuration.setString(
                 "table-storage.log.properties.bootstrap.servers", getBootstrapServers());
+        configuration.set(
+                ExecutionCheckpointingOptions.ENABLE_CHECKPOINTS_AFTER_TASKS_FINISH, true);
     }
 
     @Test

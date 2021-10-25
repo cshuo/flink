@@ -45,6 +45,7 @@ public class BatchTableStorageITCase extends BatchTestBase {
         URI folder;
         try {
             folder = TEMPORARY_FOLDER.newFolder().toURI();
+            System.out.println(folder.getPath());
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

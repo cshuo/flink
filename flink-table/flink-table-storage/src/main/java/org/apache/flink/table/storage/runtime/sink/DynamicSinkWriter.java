@@ -137,6 +137,8 @@ public class DynamicSinkWriter<LogCommT, LogStateT>
         if (logWriter != null) {
             Preconditions.checkNotNull(offsetsRetriever);
             List<LogCommT> logCommittables = logWriter.prepareCommit(flush);
+
+            // TODO compute full buckets by task id
             Map<Integer, Long> offsets = offsetsRetriever.endOffsets(buckets);
             committables.add(new DynamicCommittable<>(logCommittables, offsets));
         }

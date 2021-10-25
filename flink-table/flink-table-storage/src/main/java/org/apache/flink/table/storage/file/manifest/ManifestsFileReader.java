@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.table.storage.file.snapshot;
+package org.apache.flink.table.storage.file.manifest;
 
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.file.src.FileSourceSplit;
@@ -24,7 +24,6 @@ import org.apache.flink.connector.file.src.reader.BulkFormat;
 import org.apache.flink.connector.file.src.util.Utils;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.table.data.RowData;
-import org.apache.flink.table.storage.file.manifest.ManifestFileMeta;
 
 import java.io.IOException;
 import java.io.Serializable;
@@ -32,12 +31,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 /** */
-public class SnapshotFileReader implements Serializable {
+public class ManifestsFileReader implements Serializable {
 
     private final Configuration configuration;
     private final BulkFormat<RowData, FileSourceSplit> readerFactory;
 
-    public SnapshotFileReader(BulkFormat<RowData, FileSourceSplit> readerFactory) {
+    public ManifestsFileReader(BulkFormat<RowData, FileSourceSplit> readerFactory) {
         this.configuration = new Configuration();
         this.readerFactory = readerFactory;
     }
