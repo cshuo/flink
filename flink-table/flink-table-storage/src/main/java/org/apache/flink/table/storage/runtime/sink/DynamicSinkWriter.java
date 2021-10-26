@@ -44,6 +44,7 @@ import java.util.stream.Collectors;
 public class DynamicSinkWriter<LogCommT, LogStateT>
         implements SinkWriter<RowData, DynamicCommittable<LogCommT>, LogStateT> {
 
+    private final int task;
     private final Table table;
     private final FileStore.Factory factory;
     private final PartitionSelector partitionSelector;
@@ -54,12 +55,14 @@ public class DynamicSinkWriter<LogCommT, LogStateT>
     private final Map<String, Map<Integer, FileStore>> stores;
 
     public DynamicSinkWriter(
+            int task,
             Table table,
             FileStore.Factory factory,
             PartitionSelector partitionSelector,
             RowWriter rowWriter,
             @Nullable SinkWriter<RowData, LogCommT, LogStateT> logWriter,
             @Nullable OffsetsRetriever offsetsRetriever) {
+        this.task = task;
         this.table = table;
         this.factory = factory;
         this.partitionSelector = partitionSelector;
@@ -103,7 +106,7 @@ public class DynamicSinkWriter<LogCommT, LogStateT>
         }
 
         if (logWriter != null) {
-            logWriter.write(element, context);
+            logWriter.write(rowWriter.logRow(), context);
         }
     }
 
@@ -111,13 +114,11 @@ public class DynamicSinkWriter<LogCommT, LogStateT>
     public List<DynamicCommittable<LogCommT>> prepareCommit(boolean flush)
             throws IOException, InterruptedException {
         List<DynamicCommittable<LogCommT>> committables = new ArrayList<>();
-        List<Integer> buckets = new ArrayList<>();
         for (String partition : stores.keySet()) {
             stores.computeIfPresent(
                     partition,
                     (p, pStores) -> {
                         for (Integer bucket : pStores.keySet()) {
-                            buckets.add(bucket);
                             pStores.computeIfPresent(
                                     bucket,
                                     (b, s) -> {
@@ -139,7 +140,8 @@ public class DynamicSinkWriter<LogCommT, LogStateT>
             Preconditions.checkNotNull(offsetsRetriever);
             List<LogCommT> logCommittables = logWriter.prepareCommit(flush);
 
-            // TODO compute full buckets by task id? How? We need fixed mapping of bucket to task.
+            // Compute full buckets by task id
+            int[] buckets = BucketStreamPartitioner.taskBuckets(task, rowWriter.numBucket());
             Map<Integer, Long> offsets = offsetsRetriever.endOffsets(buckets);
             committables.add(new DynamicCommittable<>(logCommittables, offsets));
         }

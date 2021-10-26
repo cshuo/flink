@@ -19,17 +19,20 @@
 package org.apache.flink.table.storage.connector;
 
 import org.apache.flink.api.connector.sink.Sink;
+import org.apache.flink.api.dag.Transformation;
+import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.transformations.PartitionTransformation;
+import org.apache.flink.streaming.runtime.partitioner.StreamPartitioner;
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.sink.DataStreamSinkProvider;
 import org.apache.flink.table.connector.sink.DynamicTableSink;
 import org.apache.flink.table.connector.sink.SinkProvider;
-import org.apache.flink.table.connector.sink.abilities.SupportsOverwrite;
 import org.apache.flink.table.connector.sink.abilities.SupportsPartitioning;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.factories.DefaultLogTableFactory.OffsetsRetrieverFactory;
 import org.apache.flink.table.filesystem.FileSystemConnectorOptions;
 import org.apache.flink.table.storage.runtime.RowWriter;
-import org.apache.flink.table.storage.runtime.sink.BucketKeySelector;
+import org.apache.flink.table.storage.runtime.sink.BucketStreamPartitioner;
 import org.apache.flink.table.storage.runtime.sink.DynamicSink;
 import org.apache.flink.table.storage.runtime.sink.PartitionSelector;
 
@@ -38,8 +41,8 @@ import javax.annotation.Nullable;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** */
-public class TableStorageSink implements DynamicTableSink, SupportsPartitioning, SupportsOverwrite {
+/** TODO implement overwrite. */
+public class TableStorageSink implements DynamicTableSink, SupportsPartitioning {
 
     private final TableContext tableContext;
     @Nullable private final DynamicTableSink logTableSink;
@@ -70,10 +73,6 @@ public class TableStorageSink implements DynamicTableSink, SupportsPartitioning,
                         : ((SinkProvider) logTableSink.getSinkRuntimeProvider(sinkContext))
                                 .createSink();
 
-        if (overwrite) {
-            // TODO...
-        }
-
         RowWriter rowWriter = tableContext.processor().createRowWriter(tableContext.numBucket());
         DynamicSink sink =
                 new DynamicSink(
@@ -89,7 +88,16 @@ public class TableStorageSink implements DynamicTableSink, SupportsPartitioning,
                         offsetsRetrieverFactory);
 
         return (DataStreamSinkProvider)
-                dataStream -> dataStream.keyBy(new BucketKeySelector(rowWriter)).sinkTo(sink);
+                dataStream -> {
+                    // Using StreamPartitioner instead of KeySelector to produce fixed bucket-task
+                    // mapping.
+                    StreamPartitioner<RowData> partitioner = new BucketStreamPartitioner(rowWriter);
+                    Transformation<RowData> transformation =
+                            new PartitionTransformation<>(
+                                    dataStream.getTransformation(), partitioner);
+                    return new DataStream<>(dataStream.getExecutionEnvironment(), transformation)
+                            .sinkTo(sink);
+                };
     }
 
     @Override
@@ -104,11 +112,6 @@ public class TableStorageSink implements DynamicTableSink, SupportsPartitioning,
     @Override
     public String asSummaryString() {
         return "dynamic";
-    }
-
-    @Override
-    public void applyOverwrite(boolean overwrite) {
-        this.overwrite = overwrite;
     }
 
     @Override

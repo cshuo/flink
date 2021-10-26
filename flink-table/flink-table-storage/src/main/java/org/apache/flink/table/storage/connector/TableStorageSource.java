@@ -113,6 +113,8 @@ public class TableStorageSource implements ScanTableSource, SupportsPartitionPus
                                                     .produceDataStream(execEnv)
                                                     .getTransformation())
                                     .getSource();
+
+                    // TODO use SourceFactory to infer snapshot lazied
                     return execEnv.fromSource(
                             HybridSource.builder(createFileSource()).addSource(logSource).build(),
                             WatermarkStrategy.noWatermarks(),

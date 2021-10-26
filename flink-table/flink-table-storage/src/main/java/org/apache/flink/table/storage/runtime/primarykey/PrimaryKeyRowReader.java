@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.table.storage.runtime.pk;
+package org.apache.flink.table.storage.runtime.primarykey;
 
 import org.apache.flink.connector.file.src.util.RecordAndPosition;
 import org.apache.flink.table.data.RowData;

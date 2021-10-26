@@ -40,6 +40,7 @@ import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import javax.annotation.Nullable;
 
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -98,14 +99,9 @@ public class KafkaDefaultLogTableFactory implements DefaultLogTableFactory {
             setIfAbsent(newOptions, DELIVERY_GUARANTEE, DeliveryGuarantee.EXACTLY_ONCE.toString());
             // only one writer, we can set a unique value
             setIfAbsent(newOptions, TRANSACTIONAL_ID_PREFIX, "kafka-sink");
-
-            // TODO set correct partitioner
-            // TODO set to upsert kafka too
-            newOptions.put(SINK_PARTITIONER.key(), KafkaChangeLogSinkPartitioner.class.getName());
-
-            // TODO remove this, by {@link #onTableConsuming}.
-            setIfAbsent(newOptions, SCAN_STARTUP_MODE, ScanStartupMode.LATEST_OFFSET.toString());
         }
+
+        newOptions.put(SINK_PARTITIONER.key(), KafkaLogSinkPartitioner.class.getName());
 
         setIfAbsent(newOptions, TOPIC, topic);
 
@@ -228,8 +224,8 @@ public class KafkaDefaultLogTableFactory implements DefaultLogTableFactory {
             KafkaConsumer<?, ?> consumer = new KafkaConsumer<>(properties);
             return buckets -> {
                 List<TopicPartition> partitions =
-                        buckets.stream()
-                                .map(bucket -> new TopicPartition(topic, bucket))
+                        Arrays.stream(buckets)
+                                .mapToObj(bucket -> new TopicPartition(topic, bucket))
                                 .collect(Collectors.toList());
                 Map<TopicPartition, Long> partitionOffsets = consumer.endOffsets(partitions);
                 Map<Integer, Long> offsets = new HashMap<>();

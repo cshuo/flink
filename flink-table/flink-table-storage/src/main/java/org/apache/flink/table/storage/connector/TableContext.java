@@ -22,15 +22,9 @@ import org.apache.flink.api.common.RuntimeExecutionMode;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ExecutionOptions;
 import org.apache.flink.core.fs.Path;
-import org.apache.flink.table.api.TableConfig;
 import org.apache.flink.table.catalog.ObjectIdentifier;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.factories.DynamicTableFactory;
-import org.apache.flink.table.planner.codegen.sort.ComparatorCodeGenerator;
-import org.apache.flink.table.planner.plan.nodes.exec.spec.SortSpec;
-import org.apache.flink.table.planner.plan.utils.KeySelectorUtil;
-import org.apache.flink.table.runtime.keyselector.RowDataKeySelector;
-import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
 import org.apache.flink.table.storage.Options;
 import org.apache.flink.table.storage.filestore.Table;
 import org.apache.flink.table.storage.filestore.TableImpl;
@@ -89,29 +83,8 @@ public class TableContext {
         this.tablePath =
                 tablePath(context.getCatalogTable().getOptions(), context.getObjectIdentifier());
         this.partitionKeys = context.getCatalogTable().getPartitionKeys();
-
-        List<String> fieldNames = rowType.getFieldNames();
-        RowDataKeySelector keySelector =
-                schema.getPrimaryKey()
-                        .map(k -> k.getColumns().stream().mapToInt(fieldNames::indexOf).toArray())
-                        .map(
-                                keys ->
-                                        KeySelectorUtil.getRowDataSelector(
-                                                keys, InternalTypeInfo.of(rowType)))
-                        .orElse(null);
-
         this.numBucket = options.get(BUCKET);
-
-        this.processor =
-                Processor.create(
-                        keySelector,
-                        rowType,
-                        type ->
-                                ComparatorCodeGenerator.gen(
-                                        new TableConfig(),
-                                        "KeyComparator",
-                                        type,
-                                        SortSpec.defaultSortAll(type.getFieldCount())));
+        this.processor = Processor.create(schema);
     }
 
     public Table table() {
@@ -136,7 +109,7 @@ public class TableContext {
                         factory, context, processor.keyType(), processor.valueType());
         String uuid = UUID.randomUUID().toString();
 
-        FileFactory mainifestName =
+        FileFactory manifestName =
                 new FileFactory(
                         new Path(tablePath, "manifest"),
                         "manifest",
@@ -159,7 +132,7 @@ public class TableContext {
                         options.get(SNAPSHOTS_NUM_RETAINED),
                         options.get(FILE_META_TARGET_FILE_SIZE).getBytes(),
                         tablePath,
-                        new ManifestFileWriter(formats.getManifestWriter(), mainifestName),
+                        new ManifestFileWriter(formats.getManifestWriter(), manifestName),
                         new ManifestFileReader(
                                 formats.getManifestReader(),
                                 processor.keySerializer().getArity(),

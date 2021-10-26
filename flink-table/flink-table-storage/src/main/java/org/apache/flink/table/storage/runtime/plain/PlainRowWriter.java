@@ -44,6 +44,11 @@ public class PlainRowWriter implements RowWriter {
     }
 
     @Override
+    public RowData logRow() {
+        return row;
+    }
+
+    @Override
     public int selectBucket() {
         RowKind rowKind = row.getRowKind();
         row.setRowKind(RowKind.INSERT);

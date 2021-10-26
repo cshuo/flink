@@ -20,21 +20,30 @@ package org.apache.flink.streaming.connectors.kafka.table;
 
 import org.apache.flink.streaming.connectors.kafka.partitioner.FlinkKafkaPartitioner;
 import org.apache.flink.table.data.RowData;
-import org.apache.flink.table.data.binary.BinaryRowData;
+import org.apache.flink.table.data.utils.KeyedRowData;
 import org.apache.flink.types.RowKind;
-import org.apache.flink.util.Preconditions;
 
-/** */
-public class KafkaChangeLogSinkPartitioner extends FlinkKafkaPartitioner<RowData> {
+/**
+ * Consistent with stream partitioner of file store.
+ *
+ * <p>See RowWriter.logRow().
+ *
+ * <p>See BucketStreamPartitioner.
+ */
+public class KafkaLogSinkPartitioner extends FlinkKafkaPartitioner<RowData> {
 
     @Override
     public int partition(
             RowData record, byte[] key, byte[] value, String targetTopic, int[] partitions) {
-        Preconditions.checkArgument(record instanceof BinaryRowData);
-        RowKind rowKind = record.getRowKind();
-        record.setRowKind(RowKind.INSERT);
-        int partition = partitions[record.hashCode() % partitions.length];
-        record.setRowKind(rowKind);
-        return partition;
+        int hash;
+        if (record instanceof KeyedRowData) {
+            hash = ((KeyedRowData) record).getKey().hashCode();
+        } else {
+            RowKind rowKind = record.getRowKind();
+            record.setRowKind(RowKind.INSERT);
+            hash = record.hashCode();
+            record.setRowKind(rowKind);
+        }
+        return partitions[hash % partitions.length];
     }
 }

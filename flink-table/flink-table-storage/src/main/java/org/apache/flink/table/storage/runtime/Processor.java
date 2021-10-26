@@ -18,13 +18,21 @@
 
 package org.apache.flink.table.storage.runtime;
 
+import org.apache.flink.table.api.TableConfig;
+import org.apache.flink.table.catalog.ResolvedSchema;
+import org.apache.flink.table.planner.codegen.sort.ComparatorCodeGenerator;
+import org.apache.flink.table.planner.plan.nodes.exec.spec.SortSpec;
+import org.apache.flink.table.planner.plan.utils.KeySelectorUtil;
 import org.apache.flink.table.runtime.generated.GeneratedRecordComparator;
 import org.apache.flink.table.runtime.keyselector.RowDataKeySelector;
+import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
 import org.apache.flink.table.runtime.typeutils.RowDataSerializer;
 import org.apache.flink.table.storage.filestore.lsm.merge.MergePolicy;
-import org.apache.flink.table.storage.runtime.pk.PrimaryKeyProcessor;
 import org.apache.flink.table.storage.runtime.plain.PlainRowProcessor;
+import org.apache.flink.table.storage.runtime.primarykey.PrimaryKeyProcessor;
 import org.apache.flink.table.types.logical.RowType;
+
+import java.util.List;
 
 /** */
 public interface Processor {
@@ -45,6 +53,18 @@ public interface Processor {
 
     GeneratedRecordComparator comparator();
 
+    static Processor create(ResolvedSchema schema) {
+        return Processor.create(
+                createKeySelector(schema),
+                (RowType) schema.toPhysicalRowDataType().getLogicalType(),
+                type ->
+                        ComparatorCodeGenerator.gen(
+                                new TableConfig(),
+                                "KeyComparator",
+                                type,
+                                SortSpec.defaultSortAll(type.getFieldCount())));
+    }
+
     static Processor create(
             RowDataKeySelector keySelector, RowType rowType, ComparatorFn comparatorFn) {
         if (keySelector != null) {
@@ -52,6 +72,15 @@ public interface Processor {
         } else {
             return new PlainRowProcessor(rowType, comparatorFn);
         }
+    }
+
+    static RowDataKeySelector createKeySelector(ResolvedSchema schema) {
+        RowType rowType = (RowType) schema.toPhysicalRowDataType().getLogicalType();
+        List<String> fieldNames = rowType.getFieldNames();
+        return schema.getPrimaryKey()
+                .map(k -> k.getColumns().stream().mapToInt(fieldNames::indexOf).toArray())
+                .map(keys -> KeySelectorUtil.getRowDataSelector(keys, InternalTypeInfo.of(rowType)))
+                .orElse(null);
     }
 
     /** */

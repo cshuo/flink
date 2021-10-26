@@ -19,10 +19,11 @@
 package org.apache.flink.table.factories;
 
 import org.apache.flink.annotation.Internal;
+import org.apache.flink.table.data.RowData;
 
 import javax.annotation.Nullable;
+
 import java.io.Serializable;
-import java.util.Collection;
 import java.util.Map;
 
 /**
@@ -76,6 +77,11 @@ public interface DefaultLogTableFactory extends DynamicTableFactory {
     interface OffsetsRetriever {
 
         /** Get the end offsets for the given buckets. */
-        Map<Integer, Long> endOffsets(Collection<Integer> buckets);
+        Map<Integer, Long> endOffsets(int[] buckets);
+    }
+
+    /** Selector to select bucket for row. */
+    interface BucketSelector extends Serializable {
+        int select(RowData row);
     }
 }

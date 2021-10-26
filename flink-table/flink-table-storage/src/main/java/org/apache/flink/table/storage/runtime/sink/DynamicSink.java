@@ -76,7 +76,13 @@ public class DynamicSink<LogCommT, LogStateT>
         DefaultLogTableFactory.OffsetsRetriever offsetsRetriever =
                 offsetsRetrieverFactory == null ? null : offsetsRetrieverFactory.create();
         return new DynamicSinkWriter<>(
-                table, factory, partitionSelector, rowWriter, kafkaWriter, offsetsRetriever);
+                context.getSubtaskId(),
+                table,
+                factory,
+                partitionSelector,
+                rowWriter,
+                kafkaWriter,
+                offsetsRetriever);
     }
 
     @Override
