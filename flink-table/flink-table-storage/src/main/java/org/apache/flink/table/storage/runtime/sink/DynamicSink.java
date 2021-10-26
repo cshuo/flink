@@ -26,8 +26,8 @@ import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.factories.DefaultLogTableFactory;
 import org.apache.flink.table.runtime.typeutils.RowDataSerializer;
-import org.apache.flink.table.storage.file.Table;
-import org.apache.flink.table.storage.file.lsm.FileStore;
+import org.apache.flink.table.storage.filestore.Table;
+import org.apache.flink.table.storage.filestore.lsm.FileStore;
 import org.apache.flink.table.storage.runtime.RowWriter;
 
 import javax.annotation.Nullable;

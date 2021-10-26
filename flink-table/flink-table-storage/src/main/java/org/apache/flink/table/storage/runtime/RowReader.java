@@ -20,7 +20,7 @@ package org.apache.flink.table.storage.runtime;
 
 import org.apache.flink.connector.file.src.util.RecordAndPosition;
 import org.apache.flink.table.data.RowData;
-import org.apache.flink.table.storage.file.lsm.KeyValueIterator;
+import org.apache.flink.table.storage.filestore.lsm.KeyValueIterator;
 import org.apache.flink.util.CloseableIterator;
 
 import java.io.Serializable;

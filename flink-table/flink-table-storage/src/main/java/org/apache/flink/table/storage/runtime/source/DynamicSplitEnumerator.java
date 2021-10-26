@@ -20,7 +20,9 @@ package org.apache.flink.table.storage.runtime.source;
 
 import org.apache.flink.api.connector.source.SplitEnumerator;
 import org.apache.flink.api.connector.source.SplitEnumeratorContext;
-import org.apache.flink.table.storage.file.Table;
+import org.apache.flink.table.storage.filestore.Table;
+import org.apache.flink.table.storage.filestore.filter.InFilter;
+import org.apache.flink.table.storage.filestore.operation.Scan;
 
 import javax.annotation.Nullable;
 
@@ -37,24 +39,24 @@ public class DynamicSplitEnumerator implements SplitEnumerator<DynamicSplit, Voi
     private final Queue<DynamicSplit> splits;
 
     public DynamicSplitEnumerator(
-            SplitEnumeratorContext<DynamicSplit> context, Table table, List<String> partitions)
-            throws IOException {
+            SplitEnumeratorContext<DynamicSplit> context,
+            Table table,
+            Long snapshotId,
+            List<String> partitions) {
         this.context = context;
         this.splits = new ArrayDeque<>();
+        Scan scan = table.newScan().withSnapshot(snapshotId);
         if (partitions != null) {
-            Table.TableFiles files = table.readLatest(partitions);
-            for (String partition : files.partitions()) {
-                addSplits(partition, files.partitionFiles(partition));
-            }
-        } else {
-            addSplits(null, table.readLatest().partitionFiles(null));
+            scan = scan.withPartitionFilter(InFilter.inPartition(partitions));
         }
-    }
-
-    private void addSplits(String partition, Table.PartitionFiles files) {
-        for (int bucket : files.buckets()) {
-            splits.add(new DynamicSplit(partition, bucket, files.bucketFiles(bucket)));
-        }
+        Scan.groupByPartition(scan.plan())
+                .forEach(
+                        (partition, pFiles) ->
+                                pFiles.forEach(
+                                        (bucket, files) ->
+                                                splits.add(
+                                                        new DynamicSplit(
+                                                                partition, bucket, files))));
     }
 
     @Override

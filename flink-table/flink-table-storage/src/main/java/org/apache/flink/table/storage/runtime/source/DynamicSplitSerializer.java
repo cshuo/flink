@@ -23,14 +23,14 @@ import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.core.memory.DataOutputSerializer;
 import org.apache.flink.table.data.RowData;
-import org.apache.flink.table.storage.file.lsm.sst.SstFileMeta;
+import org.apache.flink.table.storage.filestore.lsm.sst.SstFileMeta;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.apache.flink.table.storage.file.utils.TableUtils.nullableDeserialize;
-import static org.apache.flink.table.storage.file.utils.TableUtils.nullableSerialize;
+import static org.apache.flink.table.storage.filestore.utils.TableUtils.nullableDeserialize;
+import static org.apache.flink.table.storage.filestore.utils.TableUtils.nullableSerialize;
 
 /** */
 public class DynamicSplitSerializer implements SimpleVersionedSerializer<DynamicSplit> {

@@ -19,7 +19,8 @@
 package org.apache.flink.table.storage.runtime.sink;
 
 import org.apache.flink.api.connector.sink.GlobalCommitter;
-import org.apache.flink.table.storage.file.Table;
+import org.apache.flink.table.storage.filestore.Snapshot;
+import org.apache.flink.table.storage.filestore.Table;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -54,8 +55,9 @@ public class DynamicGlobalCommitter<LogCommT>
             List<DynamicCommittable<LogCommT>> globalCommittables) throws IOException {
         DynamicCommittable<LogCommT> committable = combine(globalCommittables);
         if (!committable.getEntries().isEmpty()) {
-            table.commitChanges(committable.getEntries(), committable.getLogOffsets());
-            table.expire();
+            List<Snapshot> snapshots =
+                    table.newCommit().commit(committable.getEntries(), committable.getLogOffsets());
+            table.newExpire().withSnapshots(snapshots).expire();
         }
         return Collections.emptyList();
     }

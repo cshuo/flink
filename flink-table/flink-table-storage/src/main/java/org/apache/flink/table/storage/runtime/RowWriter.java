@@ -19,7 +19,7 @@
 package org.apache.flink.table.storage.runtime;
 
 import org.apache.flink.table.data.RowData;
-import org.apache.flink.table.storage.file.lsm.FileStore;
+import org.apache.flink.table.storage.filestore.lsm.FileStore;
 
 import java.io.Serializable;
 

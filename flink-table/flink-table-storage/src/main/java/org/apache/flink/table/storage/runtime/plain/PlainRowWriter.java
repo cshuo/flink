@@ -21,7 +21,7 @@ package org.apache.flink.table.storage.runtime.plain;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.runtime.typeutils.RowDataSerializer;
-import org.apache.flink.table.storage.file.lsm.FileStore;
+import org.apache.flink.table.storage.filestore.lsm.FileStore;
 import org.apache.flink.table.storage.runtime.RowWriter;
 import org.apache.flink.types.RowKind;
 

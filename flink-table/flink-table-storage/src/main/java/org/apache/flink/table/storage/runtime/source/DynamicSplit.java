@@ -19,7 +19,7 @@
 package org.apache.flink.table.storage.runtime.source;
 
 import org.apache.flink.api.connector.source.SourceSplit;
-import org.apache.flink.table.storage.file.lsm.sst.SstFileMeta;
+import org.apache.flink.table.storage.filestore.lsm.sst.SstFileMeta;
 
 import java.io.Serializable;
 import java.util.List;

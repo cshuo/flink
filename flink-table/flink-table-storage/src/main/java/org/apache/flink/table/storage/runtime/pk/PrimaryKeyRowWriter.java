@@ -20,8 +20,8 @@ package org.apache.flink.table.storage.runtime.pk;
 
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.runtime.keyselector.RowDataKeySelector;
-import org.apache.flink.table.storage.file.lsm.FileStore;
-import org.apache.flink.table.storage.file.lsm.StoreException;
+import org.apache.flink.table.storage.filestore.lsm.FileStore;
+import org.apache.flink.table.storage.filestore.lsm.StoreException;
 import org.apache.flink.table.storage.runtime.RowWriter;
 
 /** */

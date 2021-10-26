@@ -20,7 +20,6 @@ package org.apache.flink.table.factories;
 
 import org.apache.flink.annotation.Internal;
 
-import java.io.Serializable;
 import java.util.Map;
 
 /**
@@ -54,9 +53,7 @@ public interface DefaultDynamicTableFactory extends DynamicTableFactory {
     }
 
     /** Discovers the unique implementation of {@link DefaultLogTableFactory} without identifier. */
-    static <OFFSET extends Serializable> DefaultLogTableFactory<OFFSET> discoverDefaultLogFactory(
-            ClassLoader classLoader) {
-        //noinspection unchecked
+    static DefaultLogTableFactory discoverDefaultLogFactory(ClassLoader classLoader) {
         return FactoryUtil.discoverUniqueImplTableFactory(
                 DefaultLogTableFactory.class, classLoader);
     }

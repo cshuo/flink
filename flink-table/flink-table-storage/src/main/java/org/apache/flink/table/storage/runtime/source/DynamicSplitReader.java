@@ -24,7 +24,7 @@ import org.apache.flink.connector.base.source.reader.splitreader.SplitsAddition;
 import org.apache.flink.connector.base.source.reader.splitreader.SplitsChange;
 import org.apache.flink.connector.file.src.util.RecordAndPosition;
 import org.apache.flink.table.data.RowData;
-import org.apache.flink.table.storage.file.lsm.FileStore;
+import org.apache.flink.table.storage.filestore.lsm.FileStore;
 import org.apache.flink.table.storage.runtime.RowReader;
 import org.apache.flink.util.Preconditions;
 

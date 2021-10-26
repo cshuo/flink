@@ -21,6 +21,7 @@ package org.apache.flink.streaming.connectors.kafka.table;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.connector.base.DeliveryGuarantee;
+import org.apache.flink.streaming.connectors.kafka.table.KafkaConnectorOptions.ScanStartupMode;
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.api.TableException;
 import org.apache.flink.table.catalog.CatalogTable;
@@ -62,7 +63,7 @@ import static org.apache.flink.table.factories.FactoryUtil.CONNECTOR;
 import static org.apache.flink.table.factories.FactoryUtil.FORMAT;
 
 /** The Kafka {@link DefaultLogTableFactory} implementation. */
-public class KafkaDefaultLogTableFactory implements DefaultLogTableFactory<Long> {
+public class KafkaDefaultLogTableFactory implements DefaultLogTableFactory {
 
     public static final ConfigOption<Duration> RETENTION =
             ConfigOptions.key("retention").durationType().noDefaultValue().withDescription("");
@@ -101,6 +102,9 @@ public class KafkaDefaultLogTableFactory implements DefaultLogTableFactory<Long>
             // TODO set correct partitioner
             // TODO set to upsert kafka too
             newOptions.put(SINK_PARTITIONER.key(), KafkaChangeLogSinkPartitioner.class.getName());
+
+            // TODO remove this, by {@link #onTableConsuming}.
+            setIfAbsent(newOptions, SCAN_STARTUP_MODE, ScanStartupMode.LATEST_OFFSET.toString());
         }
 
         setIfAbsent(newOptions, TOPIC, topic);
@@ -119,13 +123,9 @@ public class KafkaDefaultLogTableFactory implements DefaultLogTableFactory<Long>
             Context context, @Nullable Map<Integer, Long> bucketOffsets) {
         Map<String, String> newOptions = new HashMap<>(context.getCatalogTable().getOptions());
         if (bucketOffsets == null) {
-            newOptions.put(
-                    SCAN_STARTUP_MODE.key(),
-                    KafkaConnectorOptions.ScanStartupMode.LATEST_OFFSET.name());
+            newOptions.put(SCAN_STARTUP_MODE.key(), ScanStartupMode.LATEST_OFFSET.toString());
         } else {
-            newOptions.put(
-                    SCAN_STARTUP_MODE.key(),
-                    KafkaConnectorOptions.ScanStartupMode.SPECIFIC_OFFSETS.name());
+            newOptions.put(SCAN_STARTUP_MODE.key(), ScanStartupMode.SPECIFIC_OFFSETS.toString());
             newOptions.put(SCAN_STARTUP_SPECIFIC_OFFSETS.key(), toKafkaOffsetsValue(bucketOffsets));
         }
         return newOptions;

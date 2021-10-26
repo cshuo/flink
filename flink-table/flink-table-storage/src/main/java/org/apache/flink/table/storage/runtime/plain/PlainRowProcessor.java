@@ -21,7 +21,7 @@ package org.apache.flink.table.storage.runtime.plain;
 import org.apache.flink.table.runtime.generated.GeneratedRecordComparator;
 import org.apache.flink.table.runtime.typeutils.InternalSerializers;
 import org.apache.flink.table.runtime.typeutils.RowDataSerializer;
-import org.apache.flink.table.storage.file.lsm.merge.MergePolicy;
+import org.apache.flink.table.storage.filestore.lsm.merge.MergePolicy;
 import org.apache.flink.table.storage.runtime.Processor;
 import org.apache.flink.table.storage.runtime.RowReader;
 import org.apache.flink.table.storage.runtime.RowWriter;

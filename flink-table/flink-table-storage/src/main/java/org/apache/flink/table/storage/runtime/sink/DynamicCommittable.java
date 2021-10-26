@@ -18,9 +18,9 @@
 
 package org.apache.flink.table.storage.runtime.sink;
 
-import org.apache.flink.table.storage.file.lsm.sst.SstFileMeta;
-import org.apache.flink.table.storage.file.manifest.FileKind;
-import org.apache.flink.table.storage.file.manifest.ManifestEntry;
+import org.apache.flink.table.storage.filestore.lsm.sst.SstFileMeta;
+import org.apache.flink.table.storage.filestore.manifest.FileKind;
+import org.apache.flink.table.storage.filestore.manifest.ManifestEntry;
 
 import java.util.ArrayList;
 import java.util.HashMap;

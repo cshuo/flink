@@ -27,8 +27,8 @@ import org.apache.flink.api.connector.source.SplitEnumeratorContext;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.runtime.typeutils.RowDataSerializer;
-import org.apache.flink.table.storage.file.Table;
-import org.apache.flink.table.storage.file.lsm.FileStore;
+import org.apache.flink.table.storage.filestore.Table;
+import org.apache.flink.table.storage.filestore.lsm.FileStore;
 import org.apache.flink.table.storage.runtime.RowReader;
 
 import java.util.List;
@@ -37,6 +37,7 @@ import java.util.List;
 public class DynamicSource implements Source<RowData, DynamicSplit, Void> {
 
     private final Table table;
+    private final Long snapshotId;
     private final FileStore.Factory factory;
     private final RowReader rowReader;
     private final RowDataSerializer keySerializer;
@@ -44,11 +45,13 @@ public class DynamicSource implements Source<RowData, DynamicSplit, Void> {
 
     public DynamicSource(
             Table table,
+            Long snapshotId,
             FileStore.Factory factory,
             RowReader rowReader,
             RowDataSerializer keySerializer,
             List<String> partitions) {
         this.table = table;
+        this.snapshotId = snapshotId;
         this.factory = factory;
         this.rowReader = rowReader;
         this.keySerializer = keySerializer;
@@ -61,15 +64,14 @@ public class DynamicSource implements Source<RowData, DynamicSplit, Void> {
     }
 
     @Override
-    public SourceReader<RowData, DynamicSplit> createReader(SourceReaderContext readerContext)
-            throws Exception {
+    public SourceReader<RowData, DynamicSplit> createReader(SourceReaderContext readerContext) {
         return new DynamicReader(readerContext, factory, rowReader);
     }
 
     @Override
     public SplitEnumerator<DynamicSplit, Void> createEnumerator(
-            SplitEnumeratorContext<DynamicSplit> enumContext) throws Exception {
-        return new DynamicSplitEnumerator(enumContext, table, partitions);
+            SplitEnumeratorContext<DynamicSplit> enumContext) {
+        return new DynamicSplitEnumerator(enumContext, table, snapshotId, partitions);
     }
 
     @Override

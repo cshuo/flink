@@ -21,7 +21,6 @@ package org.apache.flink.table.factories;
 import org.apache.flink.annotation.Internal;
 
 import javax.annotation.Nullable;
-
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.Map;
@@ -34,7 +33,7 @@ import java.util.Map;
  * writing.
  */
 @Internal
-public interface DefaultLogTableFactory<OFFSET extends Serializable> extends DynamicTableFactory {
+public interface DefaultLogTableFactory extends DynamicTableFactory {
 
     @Override
     default String factoryIdentifier() {
@@ -59,7 +58,7 @@ public interface DefaultLogTableFactory<OFFSET extends Serializable> extends Dyn
      * @return new options of this table for consuming.
      */
     Map<String, String> onTableConsuming(
-            Context context, @Nullable Map<Integer, OFFSET> bucketOffsets);
+            Context context, @Nullable Map<Integer, Long> bucketOffsets);
 
     /** Gets factory for creating a {@link OffsetsRetriever}. */
     OffsetsRetrieverFactory createOffsetsRetrieverFactory(Context context);

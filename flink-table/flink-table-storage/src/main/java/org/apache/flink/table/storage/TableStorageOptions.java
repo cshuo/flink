@@ -126,7 +126,7 @@ public class TableStorageOptions {
                     .withDescription("Startup mode for log consumer.");
 
     /** Specifies the startup mode for log consumer. */
-    enum LogScanStartupMode implements DescribedEnum {
+    public enum LogScanStartupMode implements DescribedEnum {
         INITIAL(
                 "initial",
                 text(

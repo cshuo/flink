@@ -21,10 +21,12 @@ package org.apache.flink.table.storage.runtime.sink;
 import org.apache.flink.api.connector.sink.SinkWriter;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.factories.DefaultLogTableFactory.OffsetsRetriever;
-import org.apache.flink.table.storage.file.Table;
-import org.apache.flink.table.storage.file.lsm.FileStore;
-import org.apache.flink.table.storage.file.lsm.StoreException;
-import org.apache.flink.table.storage.file.lsm.sst.SstFileMeta;
+import org.apache.flink.table.storage.filestore.Table;
+import org.apache.flink.table.storage.filestore.filter.InFilter;
+import org.apache.flink.table.storage.filestore.lsm.FileStore;
+import org.apache.flink.table.storage.filestore.lsm.sst.SstFileMeta;
+import org.apache.flink.table.storage.filestore.manifest.ManifestEntry;
+import org.apache.flink.table.storage.filestore.operation.Scan;
 import org.apache.flink.table.storage.runtime.RowWriter;
 import org.apache.flink.util.Preconditions;
 
@@ -36,6 +38,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /** */
 public class DynamicSinkWriter<LogCommT, LogStateT>
@@ -67,15 +70,13 @@ public class DynamicSinkWriter<LogCommT, LogStateT>
     }
 
     private FileStore createStore(String partition, int bucket) {
-        Table.PartitionFiles files;
-        try {
-            files = table.readLatest(partition);
-        } catch (IOException e) {
-            throw new StoreException(e);
+        Scan scan = table.newScan().withBucket(bucket);
+        if (partition != null) {
+            scan = scan.withPartitionFilter(InFilter.equalPartition(partition));
         }
-        List<SstFileMeta> sstFiles = files.bucketFiles(bucket);
-        return factory.create(
-                partition, bucket, sstFiles == null ? Collections.emptyList() : sstFiles);
+        List<SstFileMeta> sstFiles =
+                scan.plan().stream().map(ManifestEntry::file).collect(Collectors.toList());
+        return factory.create(partition, bucket, sstFiles);
     }
 
     private FileStore getStore(String partition, int bucket) {
@@ -138,7 +139,7 @@ public class DynamicSinkWriter<LogCommT, LogStateT>
             Preconditions.checkNotNull(offsetsRetriever);
             List<LogCommT> logCommittables = logWriter.prepareCommit(flush);
 
-            // TODO compute full buckets by task id
+            // TODO compute full buckets by task id? How? We need fixed mapping of bucket to task.
             Map<Integer, Long> offsets = offsetsRetriever.endOffsets(buckets);
             committables.add(new DynamicCommittable<>(logCommittables, offsets));
         }

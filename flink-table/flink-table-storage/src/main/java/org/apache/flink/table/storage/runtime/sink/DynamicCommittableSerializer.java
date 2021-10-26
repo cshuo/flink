@@ -23,7 +23,7 @@ import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
 import org.apache.flink.table.data.RowData;
-import org.apache.flink.table.storage.file.manifest.ManifestEntry;
+import org.apache.flink.table.storage.filestore.manifest.ManifestEntry;
 
 import javax.annotation.Nullable;
 
