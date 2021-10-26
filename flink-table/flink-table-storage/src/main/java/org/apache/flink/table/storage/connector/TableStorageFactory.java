@@ -27,6 +27,7 @@ import org.apache.flink.table.connector.sink.DynamicTableSink;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.DefaultDynamicTableFactory;
 import org.apache.flink.table.factories.DefaultLogTableFactory;
+import org.apache.flink.table.factories.DefaultLogTableFactory.LogScanStartupMode;
 import org.apache.flink.table.factories.DefaultLogTableFactory.OffsetsRetrieverFactory;
 import org.apache.flink.table.factories.DynamicTableSinkFactory;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
@@ -49,7 +50,6 @@ import static org.apache.flink.table.storage.Options.FILE_META_FORMAT;
 import static org.apache.flink.table.storage.Options.FILE_META_TARGET_FILE_SIZE;
 import static org.apache.flink.table.storage.Options.FILE_ROOT_PATH;
 import static org.apache.flink.table.storage.Options.FILE_TARGET_FILE_SIZE;
-import static org.apache.flink.table.storage.Options.LOG_SCAN_STARTUP_MODE;
 import static org.apache.flink.table.storage.Options.SNAPSHOTS_NUM_RETAINED;
 import static org.apache.flink.table.storage.Options.TABLE_STORAGE_PREFIX;
 import static org.apache.flink.util.Preconditions.checkArgument;
@@ -90,20 +90,16 @@ public class TableStorageFactory
                     changeTracking(options),
                     "Table must enable change tracking in streaming mode.");
 
-            Configuration optionConfig = new Configuration();
-            options.forEach(optionConfig::setString);
-
             Long snapshotId = null;
             Map<Integer, Long> logOffsets = null;
-            switch (optionConfig.get(LOG_SCAN_STARTUP_MODE)) {
+            LogScanStartupMode startupMode = tableContext.logScanStartupMode();
+            switch (startupMode) {
                 case INITIAL:
                     List<Snapshot> snapshots = tableContext.table().loadSnapshots();
                     if (snapshots.size() > 0) {
                         Snapshot snapshot = snapshots.get(snapshots.size() - 1);
                         snapshotId = snapshot.getId();
                         logOffsets = snapshot.getLogOffsets();
-                    } else {
-                        logOffsets = new HashMap<>();
                     }
                     break;
                 case LATEST_OFFSET:
@@ -112,7 +108,7 @@ public class TableStorageFactory
 
             Map<String, String> logOptions =
                     DefaultDynamicTableFactory.discoverDefaultLogFactory(context.getClassLoader())
-                            .onTableConsuming(logContext(context, options), logOffsets);
+                            .onTableScan(logContext(context, options), startupMode, logOffsets);
 
             DynamicTableSource logTableSource =
                     FactoryUtil.createTableSource(

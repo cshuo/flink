@@ -35,6 +35,7 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.config.TopicConfig;
+import org.apache.kafka.common.requests.IsolationLevel;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 
 import javax.annotation.Nullable;
@@ -60,8 +61,10 @@ import static org.apache.flink.streaming.connectors.kafka.table.KafkaConnectorOp
 import static org.apache.flink.streaming.connectors.kafka.table.KafkaConnectorOptions.TOPIC;
 import static org.apache.flink.streaming.connectors.kafka.table.KafkaConnectorOptions.TRANSACTIONAL_ID_PREFIX;
 import static org.apache.flink.streaming.connectors.kafka.table.KafkaConnectorOptions.VALUE_FORMAT;
+import static org.apache.flink.streaming.connectors.kafka.table.KafkaConnectorOptionsUtil.PROPERTIES_PREFIX;
 import static org.apache.flink.table.factories.FactoryUtil.CONNECTOR;
 import static org.apache.flink.table.factories.FactoryUtil.FORMAT;
+import static org.apache.kafka.clients.consumer.ConsumerConfig.ISOLATION_LEVEL_CONFIG;
 
 /** The Kafka {@link DefaultLogTableFactory} implementation. */
 public class KafkaDefaultLogTableFactory implements DefaultLogTableFactory {
@@ -96,9 +99,13 @@ public class KafkaDefaultLogTableFactory implements DefaultLogTableFactory {
             setIfAbsent(newOptions, FORMAT, "debezium-json");
 
             // set EXACTLY_ONCE guarantee
-            setIfAbsent(newOptions, DELIVERY_GUARANTEE, DeliveryGuarantee.EXACTLY_ONCE.toString());
-            // only one writer, we can set a unique value
-            setIfAbsent(newOptions, TRANSACTIONAL_ID_PREFIX, "kafka-sink");
+            if (!newOptions.containsKey(DELIVERY_GUARANTEE.key())) {
+                newOptions.put(DELIVERY_GUARANTEE.key(), DeliveryGuarantee.EXACTLY_ONCE.toString());
+                newOptions.put(TRANSACTIONAL_ID_PREFIX.key(), "kafka-sink");
+                newOptions.put(
+                        PROPERTIES_PREFIX + ISOLATION_LEVEL_CONFIG,
+                        IsolationLevel.READ_COMMITTED.name().toLowerCase());
+            }
         }
 
         newOptions.put(SINK_PARTITIONER.key(), KafkaLogSinkPartitioner.class.getName());
@@ -115,16 +122,27 @@ public class KafkaDefaultLogTableFactory implements DefaultLogTableFactory {
     }
 
     @Override
-    public Map<String, String> onTableConsuming(
-            Context context, @Nullable Map<Integer, Long> bucketOffsets) {
+    public Map<String, String> onTableScan(
+            Context context,
+            LogScanStartupMode scanStartupMode,
+            @Nullable Map<Integer, Long> bucketOffsets) {
         Map<String, String> newOptions = new HashMap<>(context.getCatalogTable().getOptions());
-        if (bucketOffsets == null) {
-            newOptions.put(SCAN_STARTUP_MODE.key(), ScanStartupMode.LATEST_OFFSET.toString());
-        } else if (bucketOffsets.isEmpty()) {
-            newOptions.put(SCAN_STARTUP_MODE.key(), ScanStartupMode.EARLIEST_OFFSET.toString());
-        } else {
-            newOptions.put(SCAN_STARTUP_MODE.key(), ScanStartupMode.SPECIFIC_OFFSETS.toString());
-            newOptions.put(SCAN_STARTUP_SPECIFIC_OFFSETS.key(), toKafkaOffsetsValue(bucketOffsets));
+        switch (scanStartupMode) {
+            case INITIAL:
+                if (bucketOffsets == null) {
+                    newOptions.put(
+                            SCAN_STARTUP_MODE.key(), ScanStartupMode.EARLIEST_OFFSET.toString());
+                } else {
+                    newOptions.put(
+                            SCAN_STARTUP_MODE.key(), ScanStartupMode.SPECIFIC_OFFSETS.toString());
+                    newOptions.put(
+                            SCAN_STARTUP_SPECIFIC_OFFSETS.key(),
+                            toKafkaOffsetsValue(bucketOffsets));
+                }
+                break;
+            case LATEST_OFFSET:
+                newOptions.put(SCAN_STARTUP_MODE.key(), ScanStartupMode.LATEST_OFFSET.toString());
+                break;
         }
         return newOptions;
     }

@@ -24,8 +24,8 @@ import org.apache.flink.configuration.ExecutionOptions;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.table.catalog.ObjectIdentifier;
 import org.apache.flink.table.catalog.ResolvedSchema;
+import org.apache.flink.table.factories.DefaultLogTableFactory.LogScanStartupMode;
 import org.apache.flink.table.factories.DynamicTableFactory;
-import org.apache.flink.table.storage.Options;
 import org.apache.flink.table.storage.filestore.Table;
 import org.apache.flink.table.storage.filestore.TableImpl;
 import org.apache.flink.table.storage.filestore.lsm.FileStore;
@@ -168,7 +168,7 @@ public class TableContext {
         return processor;
     }
 
-    public Options.LogScanStartupMode logScanStartupMode() {
+    public LogScanStartupMode logScanStartupMode() {
         return options.get(LOG_SCAN_STARTUP_MODE);
     }
 

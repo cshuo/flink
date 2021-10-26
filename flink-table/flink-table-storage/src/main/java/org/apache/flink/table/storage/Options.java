@@ -20,11 +20,9 @@ package org.apache.flink.table.storage;
 
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
-import org.apache.flink.configuration.DescribedEnum;
 import org.apache.flink.configuration.MemorySize;
-import org.apache.flink.configuration.description.InlineElement;
+import org.apache.flink.table.factories.DefaultLogTableFactory.LogScanStartupMode;
 
-import static org.apache.flink.configuration.description.TextElement.text;
 import static org.apache.flink.table.factories.FactoryUtil.FORMAT_SUFFIX;
 
 /** */
@@ -124,38 +122,4 @@ public class Options {
                     .enumType(LogScanStartupMode.class)
                     .defaultValue(LogScanStartupMode.INITIAL)
                     .withDescription("Startup mode for log consumer.");
-
-    /** Specifies the startup mode for log consumer. */
-    public enum LogScanStartupMode implements DescribedEnum {
-        INITIAL(
-                "initial",
-                text(
-                        "Performs an initial snapshot on the table upon first startup,"
-                                + " and continue to read the latest changes.")),
-
-        LATEST_OFFSET(
-                "latest-offset",
-                text(
-                        "Never to perform snapshot on the table upon first startup,"
-                                + " just read from the end of the log which means only"
-                                + " have the changes since the connector was started."));
-
-        private final String value;
-        private final InlineElement description;
-
-        LogScanStartupMode(String value, InlineElement description) {
-            this.value = value;
-            this.description = description;
-        }
-
-        @Override
-        public String toString() {
-            return value;
-        }
-
-        @Override
-        public InlineElement getDescription() {
-            return description;
-        }
-    }
 }

@@ -19,11 +19,15 @@
 package org.apache.flink.table.factories;
 
 import org.apache.flink.annotation.Internal;
+import org.apache.flink.configuration.DescribedEnum;
+import org.apache.flink.configuration.description.InlineElement;
 
 import javax.annotation.Nullable;
 
 import java.io.Serializable;
 import java.util.Map;
+
+import static org.apache.flink.configuration.description.TextElement.text;
 
 /**
  * Base interface for configuring a default log table connector. The log table is used by {@link
@@ -57,11 +61,47 @@ public interface DefaultLogTableFactory extends DynamicTableFactory {
      *
      * @return new options of this table for consuming.
      */
-    Map<String, String> onTableConsuming(
-            Context context, @Nullable Map<Integer, Long> bucketOffsets);
+    Map<String, String> onTableScan(
+            Context context,
+            LogScanStartupMode scanStartupMode,
+            @Nullable Map<Integer, Long> bucketOffsets);
 
     /** Gets factory for creating a {@link OffsetsRetriever}. */
     OffsetsRetrieverFactory createOffsetsRetrieverFactory(Context context);
+
+    /** Specifies the startup mode for log consumer. */
+    enum LogScanStartupMode implements DescribedEnum {
+        INITIAL(
+                "initial",
+                text(
+                        "Performs an initial snapshot on the table upon first startup,"
+                                + " and continue to read the latest changes.")),
+
+        LATEST_OFFSET(
+                "latest-offset",
+                text(
+                        "Never to perform snapshot on the table upon first startup,"
+                                + " just read from the end of the log which means only"
+                                + " have the changes since the connector was started."));
+
+        private final String value;
+        private final InlineElement description;
+
+        LogScanStartupMode(String value, InlineElement description) {
+            this.value = value;
+            this.description = description;
+        }
+
+        @Override
+        public String toString() {
+            return value;
+        }
+
+        @Override
+        public InlineElement getDescription() {
+            return description;
+        }
+    }
 
     /** Factory to create {@link OffsetsRetriever}. */
     interface OffsetsRetrieverFactory extends Serializable {
