@@ -184,7 +184,8 @@ public class TableContext {
         return partitionKeys;
     }
 
-    public RuntimeExecutionMode runtimeExecutionMode() {
-        return context.getConfiguration().get(ExecutionOptions.RUNTIME_MODE);
+    public boolean isStreamExecution() {
+        return context.getConfiguration().get(ExecutionOptions.RUNTIME_MODE)
+                == RuntimeExecutionMode.STREAMING;
     }
 }

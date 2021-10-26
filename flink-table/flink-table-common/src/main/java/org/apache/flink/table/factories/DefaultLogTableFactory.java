@@ -19,7 +19,6 @@
 package org.apache.flink.table.factories;
 
 import org.apache.flink.annotation.Internal;
-import org.apache.flink.table.data.RowData;
 
 import javax.annotation.Nullable;
 
@@ -78,10 +77,5 @@ public interface DefaultLogTableFactory extends DynamicTableFactory {
 
         /** Get the end offsets for the given buckets. */
         Map<Integer, Long> endOffsets(int[] buckets);
-    }
-
-    /** Selector to select bucket for row. */
-    interface BucketSelector extends Serializable {
-        int select(RowData row);
     }
 }

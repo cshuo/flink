@@ -132,6 +132,7 @@ public class Options {
                 text(
                         "Performs an initial snapshot on the table upon first startup,"
                                 + " and continue to read the latest changes.")),
+
         LATEST_OFFSET(
                 "latest-offset",
                 text(

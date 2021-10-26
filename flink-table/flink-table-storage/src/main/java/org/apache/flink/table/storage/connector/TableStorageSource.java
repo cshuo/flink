@@ -18,7 +18,6 @@
 
 package org.apache.flink.table.storage.connector;
 
-import org.apache.flink.api.common.RuntimeExecutionMode;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.connector.source.Source;
 import org.apache.flink.connector.base.source.hybrid.HybridSource;
@@ -84,14 +83,12 @@ public class TableStorageSource implements ScanTableSource, SupportsPartitionPus
 
     @Override
     public ChangelogMode getChangelogMode() {
-        return tableContext.runtimeExecutionMode() == RuntimeExecutionMode.STREAMING
-                ? ChangelogMode.all()
-                : ChangelogMode.insertOnly();
+        return tableContext.isStreamExecution() ? ChangelogMode.all() : ChangelogMode.insertOnly();
     }
 
     @Override
     public ScanRuntimeProvider getScanRuntimeProvider(ScanContext sourceContext) {
-        if (tableContext.runtimeExecutionMode() == RuntimeExecutionMode.STREAMING) {
+        if (tableContext.isStreamExecution()) {
             if (logTableSource == null) {
                 throw new TableException("Log table source is null in streaming mode!");
             }
@@ -114,7 +111,8 @@ public class TableStorageSource implements ScanTableSource, SupportsPartitionPus
                                                     .getTransformation())
                                     .getSource();
 
-                    // TODO use SourceFactory to infer snapshot lazied
+                    // try using SourceFactory to infer snapshot lazied? (how to create source in
+                    // runtime?)
                     return execEnv.fromSource(
                             HybridSource.builder(createFileSource()).addSource(logSource).build(),
                             WatermarkStrategy.noWatermarks(),

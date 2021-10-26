@@ -120,6 +120,8 @@ public class KafkaDefaultLogTableFactory implements DefaultLogTableFactory {
         Map<String, String> newOptions = new HashMap<>(context.getCatalogTable().getOptions());
         if (bucketOffsets == null) {
             newOptions.put(SCAN_STARTUP_MODE.key(), ScanStartupMode.LATEST_OFFSET.toString());
+        } else if (bucketOffsets.isEmpty()) {
+            newOptions.put(SCAN_STARTUP_MODE.key(), ScanStartupMode.EARLIEST_OFFSET.toString());
         } else {
             newOptions.put(SCAN_STARTUP_MODE.key(), ScanStartupMode.SPECIFIC_OFFSETS.toString());
             newOptions.put(SCAN_STARTUP_SPECIFIC_OFFSETS.key(), toKafkaOffsetsValue(bucketOffsets));
