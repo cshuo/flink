@@ -42,16 +42,16 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-import static org.apache.flink.table.storage.TableStorageOptions.BUCKET;
-import static org.apache.flink.table.storage.TableStorageOptions.CHANGE_TRACKING;
-import static org.apache.flink.table.storage.TableStorageOptions.FILE_FORMAT;
-import static org.apache.flink.table.storage.TableStorageOptions.FILE_META_FORMAT;
-import static org.apache.flink.table.storage.TableStorageOptions.FILE_META_TARGET_FILE_SIZE;
-import static org.apache.flink.table.storage.TableStorageOptions.FILE_ROOT_PATH;
-import static org.apache.flink.table.storage.TableStorageOptions.FILE_TARGET_FILE_SIZE;
-import static org.apache.flink.table.storage.TableStorageOptions.LOG_SCAN_STARTUP_MODE;
-import static org.apache.flink.table.storage.TableStorageOptions.SNAPSHOTS_NUM_RETAINED;
-import static org.apache.flink.table.storage.TableStorageOptions.TABLE_STORAGE_PREFIX;
+import static org.apache.flink.table.storage.Options.BUCKET;
+import static org.apache.flink.table.storage.Options.CHANGE_TRACKING;
+import static org.apache.flink.table.storage.Options.FILE_FORMAT;
+import static org.apache.flink.table.storage.Options.FILE_META_FORMAT;
+import static org.apache.flink.table.storage.Options.FILE_META_TARGET_FILE_SIZE;
+import static org.apache.flink.table.storage.Options.FILE_ROOT_PATH;
+import static org.apache.flink.table.storage.Options.FILE_TARGET_FILE_SIZE;
+import static org.apache.flink.table.storage.Options.LOG_SCAN_STARTUP_MODE;
+import static org.apache.flink.table.storage.Options.SNAPSHOTS_NUM_RETAINED;
+import static org.apache.flink.table.storage.Options.TABLE_STORAGE_PREFIX;
 
 /** */
 public class TableStorageFactory

@@ -28,7 +28,7 @@ import static org.apache.flink.configuration.description.TextElement.text;
 import static org.apache.flink.table.factories.FactoryUtil.FORMAT_SUFFIX;
 
 /** */
-public class TableStorageOptions {
+public class Options {
 
     public static final String TABLE_STORAGE_PREFIX = "table-storage.";
 

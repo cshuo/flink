@@ -31,7 +31,7 @@ import org.apache.flink.table.planner.plan.nodes.exec.spec.SortSpec;
 import org.apache.flink.table.planner.plan.utils.KeySelectorUtil;
 import org.apache.flink.table.runtime.keyselector.RowDataKeySelector;
 import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
-import org.apache.flink.table.storage.TableStorageOptions;
+import org.apache.flink.table.storage.Options;
 import org.apache.flink.table.storage.filestore.Table;
 import org.apache.flink.table.storage.filestore.TableImpl;
 import org.apache.flink.table.storage.filestore.lsm.FileStore;
@@ -47,20 +47,20 @@ import org.apache.flink.table.types.logical.RowType;
 import java.util.List;
 import java.util.UUID;
 
-import static org.apache.flink.table.storage.TableStorageOptions.BUCKET;
-import static org.apache.flink.table.storage.TableStorageOptions.FILE_COMMIT_FORCE_COMPACT;
-import static org.apache.flink.table.storage.TableStorageOptions.FILE_COMPACTION_MAX_SIZE_AMPLIFICATION_PERCENT;
-import static org.apache.flink.table.storage.TableStorageOptions.FILE_COMPACTION_SIZE_RATIO;
-import static org.apache.flink.table.storage.TableStorageOptions.FILE_FORMAT;
-import static org.apache.flink.table.storage.TableStorageOptions.FILE_LEVEL0_NUM_FILES;
-import static org.apache.flink.table.storage.TableStorageOptions.FILE_META_FORMAT;
-import static org.apache.flink.table.storage.TableStorageOptions.FILE_META_TARGET_FILE_SIZE;
-import static org.apache.flink.table.storage.TableStorageOptions.FILE_MIN_FILE_SIZE;
-import static org.apache.flink.table.storage.TableStorageOptions.FILE_NUM_LEVELS;
-import static org.apache.flink.table.storage.TableStorageOptions.FILE_TARGET_FILE_SIZE;
-import static org.apache.flink.table.storage.TableStorageOptions.LOG_SCAN_STARTUP_MODE;
-import static org.apache.flink.table.storage.TableStorageOptions.SNAPSHOTS_NUM_EXPIRE_TRIGGER;
-import static org.apache.flink.table.storage.TableStorageOptions.SNAPSHOTS_NUM_RETAINED;
+import static org.apache.flink.table.storage.Options.BUCKET;
+import static org.apache.flink.table.storage.Options.FILE_COMMIT_FORCE_COMPACT;
+import static org.apache.flink.table.storage.Options.FILE_COMPACTION_MAX_SIZE_AMPLIFICATION_PERCENT;
+import static org.apache.flink.table.storage.Options.FILE_COMPACTION_SIZE_RATIO;
+import static org.apache.flink.table.storage.Options.FILE_FORMAT;
+import static org.apache.flink.table.storage.Options.FILE_LEVEL0_NUM_FILES;
+import static org.apache.flink.table.storage.Options.FILE_META_FORMAT;
+import static org.apache.flink.table.storage.Options.FILE_META_TARGET_FILE_SIZE;
+import static org.apache.flink.table.storage.Options.FILE_MIN_FILE_SIZE;
+import static org.apache.flink.table.storage.Options.FILE_NUM_LEVELS;
+import static org.apache.flink.table.storage.Options.FILE_TARGET_FILE_SIZE;
+import static org.apache.flink.table.storage.Options.LOG_SCAN_STARTUP_MODE;
+import static org.apache.flink.table.storage.Options.SNAPSHOTS_NUM_EXPIRE_TRIGGER;
+import static org.apache.flink.table.storage.Options.SNAPSHOTS_NUM_RETAINED;
 import static org.apache.flink.table.storage.connector.TableStorageFactory.tablePath;
 
 /** */
@@ -195,7 +195,7 @@ public class TableContext {
         return processor;
     }
 
-    public TableStorageOptions.LogScanStartupMode logScanStartupMode() {
+    public Options.LogScanStartupMode logScanStartupMode() {
         return options.get(LOG_SCAN_STARTUP_MODE);
     }
 

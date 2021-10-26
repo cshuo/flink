@@ -47,8 +47,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.apache.flink.table.factories.FactoryUtil.createTableFactoryHelper;
-import static org.apache.flink.table.storage.TableStorageOptions.FILE_FORMAT;
-import static org.apache.flink.table.storage.TableStorageOptions.FILE_META_FORMAT;
+import static org.apache.flink.table.storage.Options.FILE_FORMAT;
+import static org.apache.flink.table.storage.Options.FILE_META_FORMAT;
 import static org.apache.flink.table.types.utils.TypeConversions.fromLogicalToDataType;
 
 /** */
