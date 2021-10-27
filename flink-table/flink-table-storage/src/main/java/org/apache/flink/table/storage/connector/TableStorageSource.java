@@ -18,24 +18,20 @@
 
 package org.apache.flink.table.storage.connector;
 
-import org.apache.flink.api.common.eventtime.WatermarkStrategy;
-import org.apache.flink.api.connector.source.Source;
+import org.apache.flink.api.connector.source.Boundedness;
 import org.apache.flink.connector.base.source.hybrid.HybridSource;
 import org.apache.flink.core.fs.Path;
-import org.apache.flink.streaming.api.datastream.DataStream;
-import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.transformations.SourceTransformation;
 import org.apache.flink.table.api.TableException;
 import org.apache.flink.table.connector.ChangelogMode;
-import org.apache.flink.table.connector.source.DataStreamScanProvider;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
 import org.apache.flink.table.connector.source.SourceProvider;
 import org.apache.flink.table.connector.source.abilities.SupportsFilterPushDown;
 import org.apache.flink.table.connector.source.abilities.SupportsPartitionPushDown;
-import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.storage.filestore.Table;
 import org.apache.flink.table.storage.filestore.manifest.ManifestEntry;
+import org.apache.flink.table.storage.logstore.LogStoreFactory.LogScanStartupMode;
+import org.apache.flink.table.storage.logstore.LogStoreFactory.LogSourceProvider;
 import org.apache.flink.table.storage.runtime.source.DynamicSource;
 import org.apache.flink.table.utils.PartitionPathUtils;
 
@@ -53,25 +49,19 @@ public class TableStorageSource implements ScanTableSource, SupportsPartitionPus
 
     private final TableContext tableContext;
 
-    private final Long snapshotId;
-
-    @Nullable private final DynamicTableSource logTableSource;
+    @Nullable private final LogSourceProvider logSourceProvider;
 
     private List<Map<String, String>> remainingPartitions;
 
     public TableStorageSource(
-            TableContext tableContext,
-            Long snapshotId,
-            @Nullable DynamicTableSource logTableSource) {
+            TableContext tableContext, @Nullable LogSourceProvider logSourceProvider) {
         this.tableContext = tableContext;
-        this.snapshotId = snapshotId;
-        this.logTableSource = logTableSource;
+        this.logSourceProvider = logSourceProvider;
     }
 
     @Override
     public DynamicTableSource copy() {
-        TableStorageSource source =
-                new TableStorageSource(tableContext, snapshotId, logTableSource);
+        TableStorageSource source = new TableStorageSource(tableContext, logSourceProvider);
         source.remainingPartitions = remainingPartitions;
         return source;
     }
@@ -83,48 +73,40 @@ public class TableStorageSource implements ScanTableSource, SupportsPartitionPus
 
     @Override
     public ChangelogMode getChangelogMode() {
-        return tableContext.isStreamExecution() ? ChangelogMode.all() : ChangelogMode.insertOnly();
+        return tableContext.isStreamExecution()
+                ? tableContext.processor().logChangelogMode()
+                : ChangelogMode.insertOnly();
     }
 
+    @SuppressWarnings({"unchecked", "rawtypes"})
     @Override
     public ScanRuntimeProvider getScanRuntimeProvider(ScanContext sourceContext) {
         if (tableContext.isStreamExecution()) {
-            if (logTableSource == null) {
-                throw new TableException("Log table source is null in streaming mode!");
+            if (logSourceProvider == null) {
+                throw new TableException("Log source is null in streaming mode!");
             }
 
-            if (snapshotId == null) {
-                return ((ScanTableSource) logTableSource).getScanRuntimeProvider(sourceContext);
+            switch (tableContext.logScanStartupMode()) {
+                case INITIAL:
+                    // return hybrid source, initial snapshot on the table upon first startup, and
+                    // continue to read the latest changes.
+                    return SourceProvider.of(
+                            HybridSource.builder(createFileSource())
+                                    .addSource(
+                                            (HybridSource.SourceFactory)
+                                                    new HybridSourceFactory(logSourceProvider),
+                                            Boundedness.CONTINUOUS_UNBOUNDED)
+                                    .build());
+                case LATEST_OFFSET:
+                    // return log source, read the latest changes.
+                    return SourceProvider.of(
+                            logSourceProvider.createSource(LogScanStartupMode.LATEST_OFFSET, null));
+                default:
+                    throw new UnsupportedOperationException(
+                            "Unsupported log startup mode: " + tableContext.logScanStartupMode());
             }
-
-            // TODO to source provider after new source watermark push down
-            return new DataStreamScanProvider() {
-                @Override
-                public DataStream<RowData> produceDataStream(StreamExecutionEnvironment execEnv) {
-                    Source logSource =
-                            ((SourceTransformation)
-                                            ((DataStreamScanProvider)
-                                                            ((ScanTableSource) logTableSource)
-                                                                    .getScanRuntimeProvider(
-                                                                            sourceContext))
-                                                    .produceDataStream(execEnv)
-                                                    .getTransformation())
-                                    .getSource();
-
-                    // try using SourceFactory to infer snapshot lazied? (how to create source in
-                    // runtime?)
-                    return execEnv.fromSource(
-                            HybridSource.builder(createFileSource()).addSource(logSource).build(),
-                            WatermarkStrategy.noWatermarks(),
-                            "HybridSource-" + tableContext.identifier());
-                }
-
-                @Override
-                public boolean isBounded() {
-                    return false;
-                }
-            };
         } else {
+            // return file source, snapshot on the table.
             return SourceProvider.of(createFileSource());
         }
     }
@@ -135,7 +117,7 @@ public class TableStorageSource implements ScanTableSource, SupportsPartitionPus
 
         return new DynamicSource(
                 tableContext.table(),
-                snapshotId,
+                null,
                 tableContext.storeFactory(),
                 tableContext.processor().createRowReader(),
                 tableContext.processor().keySerializer(),
@@ -149,7 +131,7 @@ public class TableStorageSource implements ScanTableSource, SupportsPartitionPus
             Table table = tableContext.table();
             if (table.path().getFileSystem().exists(table.path())) {
                 return Optional.of(
-                        table.newScan().plan().stream()
+                        table.newScan().plan().files.stream()
                                 .map(ManifestEntry::partition)
                                 .distinct()
                                 .map(Path::new)

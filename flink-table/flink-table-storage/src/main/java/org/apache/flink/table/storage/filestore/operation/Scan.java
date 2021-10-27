@@ -27,6 +27,8 @@ import org.apache.flink.table.storage.filestore.manifest.FileIdentifier;
 import org.apache.flink.table.storage.filestore.manifest.ManifestEntry;
 import org.apache.flink.table.storage.filestore.manifest.ManifestFileMeta;
 
+import javax.annotation.Nullable;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -72,41 +74,41 @@ public class Scan {
         return this;
     }
 
-    private List<ManifestFileMeta> loadManifests() {
+    public Plan plan() {
         if (manifests != null && snapshotId != null) {
             throw new StoreException("manifests and snapshotId cannot be specified together.");
         }
 
-        if (manifests != null) {
-            return manifests;
-        }
+        List<ManifestFileMeta> manifests = this.manifests;
 
-        List<Snapshot> snapshots = table.loadSnapshots();
-        if (snapshots.isEmpty()) {
-            return Collections.emptyList();
-        }
+        Snapshot snapshot = null;
 
-        Snapshot snapshot = snapshots.get(snapshots.size() - 1);
-        if (snapshotId != null) {
-            boolean find = false;
-            for (Snapshot s : snapshots) {
-                if (s.getId() == snapshotId) {
-                    find = true;
-                    snapshot = s;
-                    break;
+        if (manifests == null) {
+            List<Snapshot> snapshots = table.loadSnapshots();
+            if (snapshots.isEmpty()) {
+                return new Plan(null, Collections.emptyList());
+            }
+
+            snapshot = snapshots.get(snapshots.size() - 1);
+            if (snapshotId != null) {
+                boolean find = false;
+                for (Snapshot s : snapshots) {
+                    if (s.getId() == snapshotId) {
+                        find = true;
+                        snapshot = s;
+                        break;
+                    }
+                }
+                if (!find) {
+                    throw new StoreException("Can not find snapshot: " + snapshotId);
                 }
             }
-            if (!find) {
-                throw new StoreException("Can not find snapshot: " + snapshotId);
-            }
+
+            manifests = table.loadManifests(snapshot);
         }
 
-        return table.loadManifests(snapshot);
-    }
-
-    public List<ManifestEntry> plan() {
-        Stream<ManifestFileMeta> manifests =
-                loadManifests()
+        Stream<ManifestFileMeta> filteredManifests =
+                manifests
                         .parallelStream()
                         .filter(
                                 manifest ->
@@ -115,7 +117,7 @@ public class Scan {
                                                 manifest.getUpperPartition()));
 
         LinkedHashMap<FileIdentifier, ManifestEntry> fileMap = new LinkedHashMap<>();
-        manifests
+        filteredManifests
                 .flatMap(manifest -> table.loadFiles(manifest).stream())
                 .filter(file -> partitionFilter.test(file.partition()))
                 .filter(file -> bucket == null || bucket == file.bucket())
@@ -136,7 +138,7 @@ public class Scan {
                             }
                         });
 
-        return new ArrayList<>(fileMap.values());
+        return new Plan(snapshot, new ArrayList<>(fileMap.values()));
     }
 
     public static Map<String, Map<Integer, List<SstFileMeta>>> groupByPartition(
@@ -148,5 +150,17 @@ public class Scan {
                                 .computeIfAbsent(file.bucket(), k -> new ArrayList<>())
                                 .add(file.file()));
         return ret;
+    }
+
+    /** */
+    public static class Plan {
+
+        @Nullable public final Snapshot snapshot;
+        public final List<ManifestEntry> files;
+
+        public Plan(@Nullable Snapshot snapshot, List<ManifestEntry> files) {
+            this.snapshot = snapshot;
+            this.files = files;
+        }
     }
 }

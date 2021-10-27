@@ -27,18 +27,20 @@ import org.apache.flink.table.connector.sink.DynamicTableSink;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.DefaultDynamicTableFactory;
 import org.apache.flink.table.factories.DefaultLogTableFactory;
-import org.apache.flink.table.factories.DefaultLogTableFactory.LogScanStartupMode;
 import org.apache.flink.table.factories.DefaultLogTableFactory.OffsetsRetrieverFactory;
 import org.apache.flink.table.factories.DynamicTableSinkFactory;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
-import org.apache.flink.table.storage.filestore.Snapshot;
+import org.apache.flink.table.storage.logstore.LogStoreFactory;
+import org.apache.flink.table.storage.logstore.LogStoreFactory.LogSinkProvider;
+import org.apache.flink.table.storage.logstore.LogStoreFactory.LogSourceProvider;
+import org.apache.flink.table.storage.logstore.LogStoreFactoryContextImpl;
+import org.apache.flink.table.storage.logstore.kafka.KafkaLogStoreFactory;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -60,77 +62,30 @@ public class TableStorageFactory
 
     public static final String LOG_OPTION_PREFIX = "log.";
 
+    private final LogStoreFactory logStoreFactory = new KafkaLogStoreFactory();
+
     @Override
     public DynamicTableSink createDynamicTableSink(Context context) {
-        DynamicTableSink logSink = null;
+        LogSinkProvider logSinkProvider = null;
         Map<String, String> options = context.getCatalogTable().getOptions();
         if (changeTracking(options)) {
-            logSink =
-                    FactoryUtil.createTableSink(
-                            null,
-                            context.getObjectIdentifier(),
-                            context.getCatalogTable().copy(logOptions(options)),
-                            context.getConfiguration(),
-                            context.getClassLoader(),
-                            context.isTemporary());
+            logSinkProvider = logStoreFactory.getSinkProvider(createLogStoreContext(context));
         }
 
-        OffsetsRetrieverFactory offsetsRetrieverFactory =
-                createOffsetsRetrieverFactory(context).orElse(null);
-        return new TableStorageSink(
-                new TableContext(this, context), logSink, offsetsRetrieverFactory);
+        return new TableStorageSink(new TableContext(this, context), logSinkProvider);
     }
 
     @Override
     public DynamicTableSource createDynamicTableSource(Context context) {
+        LogSourceProvider logSourceProvider = null;
         TableContext tableContext = new TableContext(this, context);
         if (tableContext.isStreamExecution()) {
-            Map<String, String> options = context.getCatalogTable().getOptions();
             checkArgument(
-                    changeTracking(options),
+                    changeTracking(context.getCatalogTable().getOptions()),
                     "Table must enable change tracking in streaming mode.");
-
-            Long snapshotId = null;
-            Map<Integer, Long> logOffsets = null;
-            LogScanStartupMode startupMode = tableContext.logScanStartupMode();
-            switch (startupMode) {
-                case INITIAL:
-                    List<Snapshot> snapshots = tableContext.table().loadSnapshots();
-                    if (snapshots.size() > 0) {
-                        Snapshot snapshot = snapshots.get(snapshots.size() - 1);
-                        snapshotId = snapshot.getId();
-                        logOffsets = snapshot.getLogOffsets();
-                    }
-                    break;
-                case LATEST_OFFSET:
-                    break;
-            }
-
-            Map<String, String> logOptions =
-                    DefaultDynamicTableFactory.discoverDefaultLogFactory(context.getClassLoader())
-                            .onTableScan(logContext(context, options), startupMode, logOffsets);
-
-            DynamicTableSource logTableSource =
-                    FactoryUtil.createTableSource(
-                            null,
-                            context.getObjectIdentifier(),
-                            context.getCatalogTable().copy(logOptions),
-                            context.getConfiguration(),
-                            context.getClassLoader(),
-                            context.isTemporary());
-
-            if (snapshotId == null) {
-                // return log source, read the latest changes.
-                return logTableSource;
-            } else {
-                // return hybrid source, initial snapshot on the table upon first startup, and
-                // continue to read the latest changes.
-                return new TableStorageSource(tableContext, snapshotId, logTableSource);
-            }
-        } else {
-            // return file source, snapshot on the table.
-            return new TableStorageSource(tableContext, null, null);
+            logSourceProvider = logStoreFactory.getSourceProvider(createLogStoreContext(context));
         }
+        return new TableStorageSource(tableContext, logSourceProvider);
     }
 
     @Override
@@ -174,15 +129,7 @@ public class TableStorageFactory
         }
 
         if (changeTracking(newOptions)) {
-            DefaultLogTableFactory logFactory =
-                    DefaultDynamicTableFactory.discoverDefaultLogFactory(context.getClassLoader());
-            int numBucket =
-                    Integer.parseInt(
-                            newOptions.getOrDefault(
-                                    BUCKET.key(), BUCKET.defaultValue().toString()));
-            Map<String, String> newLogOptions =
-                    logFactory.onTableCreation(logContext(context, newOptions), numBucket);
-            newLogOptions.forEach((k, v) -> newOptions.put(LOG_OPTION_PREFIX + k, v));
+            logStoreFactory.onTableCreation(createLogStoreContext(context, newOptions));
         }
 
         return newOptions;
@@ -199,9 +146,7 @@ public class TableStorageFactory
         }
 
         if (changeTracking(options)) {
-            DefaultLogTableFactory logFactory =
-                    DefaultDynamicTableFactory.discoverDefaultLogFactory(context.getClassLoader());
-            logFactory.onTableDrop(logContext(context, options));
+            logStoreFactory.onTableDrop(createLogStoreContext(context));
         }
     }
 
@@ -246,5 +191,30 @@ public class TableStorageFactory
                     }
                 });
         return options;
+    }
+
+    private LogStoreFactory.Context createLogStoreContext(Context context) {
+        return createLogStoreContext(context, null);
+    }
+
+    private LogStoreFactory.Context createLogStoreContext(
+            Context context, Map<String, String> options) {
+        if (options == null) {
+            options = context.getCatalogTable().getOptions();
+        }
+
+        return new LogStoreFactoryContextImpl(
+                context.getObjectIdentifier(),
+                context.getCatalogTable().getResolvedSchema(),
+                logOptions(options),
+                context.getConfiguration(),
+                context.getClassLoader(),
+                context.isTemporary(),
+                bucket(options));
+    }
+
+    private int bucket(Map<String, String> options) {
+        return Integer.parseInt(
+                options.getOrDefault(BUCKET.key(), BUCKET.defaultValue().toString()));
     }
 }

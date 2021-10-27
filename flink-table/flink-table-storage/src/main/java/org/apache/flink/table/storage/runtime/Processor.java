@@ -20,6 +20,7 @@ package org.apache.flink.table.storage.runtime;
 
 import org.apache.flink.table.api.TableConfig;
 import org.apache.flink.table.catalog.ResolvedSchema;
+import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.planner.codegen.sort.ComparatorCodeGenerator;
 import org.apache.flink.table.planner.plan.nodes.exec.spec.SortSpec;
 import org.apache.flink.table.planner.plan.utils.KeySelectorUtil;
@@ -36,6 +37,8 @@ import java.util.List;
 
 /** */
 public interface Processor {
+
+    ChangelogMode logChangelogMode();
 
     RowReader createRowReader();
 

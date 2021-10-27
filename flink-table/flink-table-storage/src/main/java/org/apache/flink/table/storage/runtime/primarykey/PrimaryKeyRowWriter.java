@@ -19,7 +19,6 @@
 package org.apache.flink.table.storage.runtime.primarykey;
 
 import org.apache.flink.table.data.RowData;
-import org.apache.flink.table.data.utils.KeyedRowData;
 import org.apache.flink.table.runtime.keyselector.RowDataKeySelector;
 import org.apache.flink.table.storage.filestore.lsm.FileStore;
 import org.apache.flink.table.storage.filestore.lsm.StoreException;
@@ -47,11 +46,6 @@ public class PrimaryKeyRowWriter implements RowWriter {
         } catch (Exception e) {
             throw new StoreException(e);
         }
-    }
-
-    @Override
-    public RowData logRow() {
-        return new KeyedRowData(key, row);
     }
 
     @Override

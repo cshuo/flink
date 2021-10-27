@@ -18,7 +18,6 @@
 
 package org.apache.flink.table.storage.connector;
 
-import org.apache.flink.api.connector.sink.Sink;
 import org.apache.flink.api.dag.Transformation;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.transformations.PartitionTransformation;
@@ -26,11 +25,10 @@ import org.apache.flink.streaming.runtime.partitioner.StreamPartitioner;
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.sink.DataStreamSinkProvider;
 import org.apache.flink.table.connector.sink.DynamicTableSink;
-import org.apache.flink.table.connector.sink.SinkProvider;
 import org.apache.flink.table.connector.sink.abilities.SupportsPartitioning;
 import org.apache.flink.table.data.RowData;
-import org.apache.flink.table.factories.DefaultLogTableFactory.OffsetsRetrieverFactory;
 import org.apache.flink.table.filesystem.FileSystemConnectorOptions;
+import org.apache.flink.table.storage.logstore.LogStoreFactory.LogSinkProvider;
 import org.apache.flink.table.storage.runtime.RowWriter;
 import org.apache.flink.table.storage.runtime.sink.BucketStreamPartitioner;
 import org.apache.flink.table.storage.runtime.sink.DynamicSink;
@@ -45,19 +43,14 @@ import java.util.Map;
 public class TableStorageSink implements DynamicTableSink, SupportsPartitioning {
 
     private final TableContext tableContext;
-    @Nullable private final DynamicTableSink logTableSink;
-    @Nullable private final OffsetsRetrieverFactory offsetsRetrieverFactory;
+    @Nullable private final LogSinkProvider logSinkProvider;
 
     private boolean overwrite;
     private LinkedHashMap<String, String> staticPartition;
 
-    public TableStorageSink(
-            TableContext tableContext,
-            @Nullable DynamicTableSink logTableSink,
-            @Nullable OffsetsRetrieverFactory offsetsRetrieverFactory) {
+    public TableStorageSink(TableContext tableContext, @Nullable LogSinkProvider logSinkProvider) {
         this.tableContext = tableContext;
-        this.logTableSink = logTableSink;
-        this.offsetsRetrieverFactory = offsetsRetrieverFactory;
+        this.logSinkProvider = logSinkProvider;
     }
 
     @Override
@@ -67,12 +60,6 @@ public class TableStorageSink implements DynamicTableSink, SupportsPartitioning 
 
     @Override
     public SinkRuntimeProvider getSinkRuntimeProvider(Context sinkContext) {
-        Sink<RowData, ?, ?, ?> logSink =
-                logTableSink == null
-                        ? null
-                        : ((SinkProvider) logTableSink.getSinkRuntimeProvider(sinkContext))
-                                .createSink();
-
         RowWriter rowWriter = tableContext.processor().createRowWriter(tableContext.numBucket());
         DynamicSink sink =
                 new DynamicSink(
@@ -84,8 +71,7 @@ public class TableStorageSink implements DynamicTableSink, SupportsPartitioning 
                                 FileSystemConnectorOptions.PARTITION_DEFAULT_NAME.defaultValue()),
                         rowWriter,
                         tableContext.processor().keySerializer(),
-                        logSink,
-                        offsetsRetrieverFactory);
+                        logSinkProvider);
 
         return (DataStreamSinkProvider)
                 dataStream -> {
@@ -102,8 +88,7 @@ public class TableStorageSink implements DynamicTableSink, SupportsPartitioning 
 
     @Override
     public DynamicTableSink copy() {
-        TableStorageSink sink =
-                new TableStorageSink(tableContext, logTableSink, offsetsRetrieverFactory);
+        TableStorageSink sink = new TableStorageSink(tableContext, logSinkProvider);
         sink.overwrite = overwrite;
         sink.staticPartition = staticPartition;
         return sink;

@@ -20,13 +20,13 @@ package org.apache.flink.table.storage.runtime.sink;
 
 import org.apache.flink.api.connector.sink.SinkWriter;
 import org.apache.flink.table.data.RowData;
-import org.apache.flink.table.factories.DefaultLogTableFactory.OffsetsRetriever;
 import org.apache.flink.table.storage.filestore.Table;
 import org.apache.flink.table.storage.filestore.filter.InFilter;
 import org.apache.flink.table.storage.filestore.lsm.FileStore;
 import org.apache.flink.table.storage.filestore.lsm.sst.SstFileMeta;
 import org.apache.flink.table.storage.filestore.manifest.ManifestEntry;
 import org.apache.flink.table.storage.filestore.operation.Scan;
+import org.apache.flink.table.storage.logstore.LogStoreFactory.OffsetsRetriever;
 import org.apache.flink.table.storage.runtime.RowWriter;
 import org.apache.flink.util.Preconditions;
 
@@ -78,7 +78,7 @@ public class DynamicSinkWriter<LogCommT, LogStateT>
             scan = scan.withPartitionFilter(InFilter.equalPartition(partition));
         }
         List<SstFileMeta> sstFiles =
-                scan.plan().stream().map(ManifestEntry::file).collect(Collectors.toList());
+                scan.plan().files.stream().map(ManifestEntry::file).collect(Collectors.toList());
         return factory.create(partition, bucket, sstFiles);
     }
 
@@ -106,7 +106,7 @@ public class DynamicSinkWriter<LogCommT, LogStateT>
         }
 
         if (logWriter != null) {
-            logWriter.write(rowWriter.logRow(), context);
+            logWriter.write(new BucketRowData(rowWriter.selectBucket(), element), context);
         }
     }
 
@@ -173,6 +173,9 @@ public class DynamicSinkWriter<LogCommT, LogStateT>
     public void close() throws Exception {
         if (logWriter != null) {
             logWriter.close();
+        }
+        if (offsetsRetriever != null) {
+            this.offsetsRetriever.close();
         }
     }
 }

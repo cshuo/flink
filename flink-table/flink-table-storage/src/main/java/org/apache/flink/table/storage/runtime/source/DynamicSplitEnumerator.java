@@ -20,6 +20,7 @@ package org.apache.flink.table.storage.runtime.source;
 
 import org.apache.flink.api.connector.source.SplitEnumerator;
 import org.apache.flink.api.connector.source.SplitEnumeratorContext;
+import org.apache.flink.table.storage.filestore.Snapshot;
 import org.apache.flink.table.storage.filestore.Table;
 import org.apache.flink.table.storage.filestore.filter.InFilter;
 import org.apache.flink.table.storage.filestore.operation.Scan;
@@ -38,6 +39,8 @@ public class DynamicSplitEnumerator implements SplitEnumerator<DynamicSplit, Voi
 
     private final Queue<DynamicSplit> splits;
 
+    @Nullable private final Snapshot snapshot;
+
     public DynamicSplitEnumerator(
             SplitEnumeratorContext<DynamicSplit> context,
             Table table,
@@ -49,7 +52,9 @@ public class DynamicSplitEnumerator implements SplitEnumerator<DynamicSplit, Voi
         if (partitions != null) {
             scan = scan.withPartitionFilter(InFilter.inPartition(partitions));
         }
-        Scan.groupByPartition(scan.plan())
+        Scan.Plan plan = scan.plan();
+        this.snapshot = plan.snapshot;
+        Scan.groupByPartition(plan.files)
                 .forEach(
                         (partition, pFiles) ->
                                 pFiles.forEach(
@@ -57,6 +62,11 @@ public class DynamicSplitEnumerator implements SplitEnumerator<DynamicSplit, Voi
                                                 splits.add(
                                                         new DynamicSplit(
                                                                 partition, bucket, files))));
+    }
+
+    @Nullable
+    public Snapshot getSnapshot() {
+        return snapshot;
     }
 
     @Override

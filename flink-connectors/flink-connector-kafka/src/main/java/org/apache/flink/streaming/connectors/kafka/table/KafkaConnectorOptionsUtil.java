@@ -70,7 +70,7 @@ import static org.apache.flink.table.types.logical.utils.LogicalTypeChecks.hasRo
 
 /** Utilities for {@link KafkaConnectorOptions}. */
 @Internal
-class KafkaConnectorOptionsUtil {
+public class KafkaConnectorOptionsUtil {
 
     private static final ConfigOption<String> SCHEMA_REGISTRY_SUBJECT =
             ConfigOptions.key("schema-registry.subject").stringType().noDefaultValue();

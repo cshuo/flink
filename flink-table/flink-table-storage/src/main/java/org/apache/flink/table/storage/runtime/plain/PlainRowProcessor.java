@@ -18,6 +18,7 @@
 
 package org.apache.flink.table.storage.runtime.plain;
 
+import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.runtime.generated.GeneratedRecordComparator;
 import org.apache.flink.table.runtime.typeutils.InternalSerializers;
 import org.apache.flink.table.runtime.typeutils.RowDataSerializer;
@@ -44,6 +45,11 @@ public class PlainRowProcessor implements Processor {
                         Collections.singletonList(
                                 new RowType.RowField("COUNT", new BigIntType(false))));
         this.comparator = comparatorFn.create(rowType);
+    }
+
+    @Override
+    public ChangelogMode logChangelogMode() {
+        return ChangelogMode.all();
     }
 
     @Override

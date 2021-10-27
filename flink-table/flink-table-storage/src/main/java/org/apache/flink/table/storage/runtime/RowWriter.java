@@ -28,8 +28,6 @@ public interface RowWriter extends Serializable {
 
     void start(RowData row);
 
-    RowData logRow();
-
     int selectBucket();
 
     int numBucket();

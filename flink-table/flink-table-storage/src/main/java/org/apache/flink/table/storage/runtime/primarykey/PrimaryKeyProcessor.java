@@ -18,6 +18,7 @@
 
 package org.apache.flink.table.storage.runtime.primarykey;
 
+import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.runtime.generated.GeneratedRecordComparator;
 import org.apache.flink.table.runtime.keyselector.RowDataKeySelector;
 import org.apache.flink.table.runtime.typeutils.InternalSerializers;
@@ -42,6 +43,11 @@ public class PrimaryKeyProcessor implements Processor {
         this.valueType = rowType;
         this.keySelector = keySelector;
         this.comparator = comparatorFn.create(keySelector.getProducedType().toRowType());
+    }
+
+    @Override
+    public ChangelogMode logChangelogMode() {
+        return ChangelogMode.upsert();
     }
 
     @Override

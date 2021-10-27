@@ -15,4 +15,3 @@
 
 org.apache.flink.streaming.connectors.kafka.table.KafkaDynamicTableFactory
 org.apache.flink.streaming.connectors.kafka.table.UpsertKafkaDynamicTableFactory
-org.apache.flink.streaming.connectors.kafka.table.KafkaDefaultLogTableFactory

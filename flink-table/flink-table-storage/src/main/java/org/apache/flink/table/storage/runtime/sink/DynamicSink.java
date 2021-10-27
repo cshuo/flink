@@ -24,10 +24,11 @@ import org.apache.flink.api.connector.sink.Sink;
 import org.apache.flink.api.connector.sink.SinkWriter;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.table.data.RowData;
-import org.apache.flink.table.factories.DefaultLogTableFactory;
 import org.apache.flink.table.runtime.typeutils.RowDataSerializer;
 import org.apache.flink.table.storage.filestore.Table;
 import org.apache.flink.table.storage.filestore.lsm.FileStore;
+import org.apache.flink.table.storage.logstore.LogStoreFactory.LogSinkProvider;
+import org.apache.flink.table.storage.logstore.LogStoreFactory.OffsetsRetriever;
 import org.apache.flink.table.storage.runtime.RowWriter;
 
 import javax.annotation.Nullable;
@@ -49,7 +50,7 @@ public class DynamicSink<LogCommT, LogStateT>
 
     @Nullable private final Sink<RowData, LogCommT, LogStateT, ?> logSink;
 
-    @Nullable private final DefaultLogTableFactory.OffsetsRetrieverFactory offsetsRetrieverFactory;
+    @Nullable private final LogSinkProvider logSinkProvider;
 
     public DynamicSink(
             Table table,
@@ -57,15 +58,14 @@ public class DynamicSink<LogCommT, LogStateT>
             PartitionSelector partitionSelector,
             RowWriter rowWriter,
             RowDataSerializer keySerializer,
-            @Nullable Sink<RowData, LogCommT, LogStateT, ?> logSink,
-            @Nullable DefaultLogTableFactory.OffsetsRetrieverFactory offsetsRetrieverFactory) {
+            @Nullable LogSinkProvider logSinkProvider) {
         this.table = table;
         this.factory = factory;
         this.partitionSelector = partitionSelector;
         this.keySerializer = keySerializer;
         this.rowWriter = rowWriter;
-        this.logSink = logSink;
-        this.offsetsRetrieverFactory = offsetsRetrieverFactory;
+        this.logSink = logSinkProvider == null ? null : (Sink) logSinkProvider.createSink();
+        this.logSinkProvider = logSinkProvider;
     }
 
     @Override
@@ -73,8 +73,8 @@ public class DynamicSink<LogCommT, LogStateT>
             InitContext context, List<LogStateT> states) throws IOException {
         SinkWriter<RowData, LogCommT, LogStateT> kafkaWriter =
                 logSink == null ? null : logSink.createWriter(context, states);
-        DefaultLogTableFactory.OffsetsRetriever offsetsRetriever =
-                offsetsRetrieverFactory == null ? null : offsetsRetrieverFactory.create();
+        OffsetsRetriever offsetsRetriever =
+                logSinkProvider == null ? null : logSinkProvider.createOffsetsRetriever();
         return new DynamicSinkWriter<>(
                 context.getSubtaskId(),
                 table,

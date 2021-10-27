@@ -93,7 +93,7 @@ public class Expire {
 
         // better way to avoid reading files of next snapshot?
         Set<FileIdentifier> liveFiles =
-                table.newScan().withManifests(liveManifests).plan().stream()
+                table.newScan().withManifests(liveManifests).plan().files.stream()
                         .map(ManifestEntry::identifier)
                         .collect(Collectors.toSet());
 
