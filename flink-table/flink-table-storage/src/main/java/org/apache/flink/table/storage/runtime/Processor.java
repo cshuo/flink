@@ -60,12 +60,14 @@ public interface Processor {
         return Processor.create(
                 createKeySelector(schema),
                 (RowType) schema.toPhysicalRowDataType().getLogicalType(),
-                type ->
-                        ComparatorCodeGenerator.gen(
-                                new TableConfig(),
-                                "KeyComparator",
-                                type,
-                                SortSpec.defaultSortAll(type.getFieldCount())));
+                type -> {
+                    SortSpec.SortSpecBuilder builder = SortSpec.builder();
+                    for (int i = 0; i < type.getFieldCount(); i++) {
+                        builder.addField(i, true, false);
+                    }
+                    return ComparatorCodeGenerator.gen(
+                            new TableConfig(), "KeyComparator", type, builder.build());
+                });
     }
 
     static Processor create(

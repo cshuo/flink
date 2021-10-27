@@ -22,9 +22,7 @@ import org.apache.flink.api.common.RuntimeExecutionMode;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ExecutionOptions;
 import org.apache.flink.core.fs.Path;
-import org.apache.flink.table.catalog.ObjectIdentifier;
 import org.apache.flink.table.catalog.ResolvedSchema;
-import org.apache.flink.table.factories.DefaultLogTableFactory.LogScanStartupMode;
 import org.apache.flink.table.factories.DynamicTableFactory;
 import org.apache.flink.table.storage.filestore.Table;
 import org.apache.flink.table.storage.filestore.TableImpl;
@@ -35,6 +33,7 @@ import org.apache.flink.table.storage.filestore.manifest.ManifestFileWriter;
 import org.apache.flink.table.storage.filestore.manifest.ManifestsFileReader;
 import org.apache.flink.table.storage.filestore.manifest.ManifestsFileWriter;
 import org.apache.flink.table.storage.filestore.utils.FileFactory;
+import org.apache.flink.table.storage.logstore.LogStoreFactory;
 import org.apache.flink.table.storage.runtime.Processor;
 import org.apache.flink.table.types.logical.RowType;
 
@@ -160,15 +159,11 @@ public class TableContext {
                         options.get(FILE_FORMAT));
     }
 
-    public ObjectIdentifier identifier() {
-        return context.getObjectIdentifier();
-    }
-
     public Processor processor() {
         return processor;
     }
 
-    public LogScanStartupMode logScanStartupMode() {
+    public LogStoreFactory.LogScanStartupMode logScanStartupMode() {
         return options.get(LOG_SCAN_STARTUP_MODE);
     }
 

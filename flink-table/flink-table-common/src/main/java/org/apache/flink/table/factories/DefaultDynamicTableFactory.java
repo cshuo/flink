@@ -51,10 +51,4 @@ public interface DefaultDynamicTableFactory extends DynamicTableFactory {
         return FactoryUtil.discoverUniqueImplTableFactory(
                 DefaultDynamicTableFactory.class, classLoader);
     }
-
-    /** Discovers the unique implementation of {@link DefaultLogTableFactory} without identifier. */
-    static DefaultLogTableFactory discoverDefaultLogFactory(ClassLoader classLoader) {
-        return FactoryUtil.discoverUniqueImplTableFactory(
-                DefaultLogTableFactory.class, classLoader);
-    }
 }

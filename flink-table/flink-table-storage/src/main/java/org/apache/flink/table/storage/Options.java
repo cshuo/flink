@@ -21,7 +21,7 @@ package org.apache.flink.table.storage;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.configuration.MemorySize;
-import org.apache.flink.table.factories.DefaultLogTableFactory.LogScanStartupMode;
+import org.apache.flink.table.storage.logstore.LogStoreFactory.LogScanStartupMode;
 
 import static org.apache.flink.table.factories.FactoryUtil.FORMAT_SUFFIX;
 

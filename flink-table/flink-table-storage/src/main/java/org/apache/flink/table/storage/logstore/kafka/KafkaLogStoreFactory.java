@@ -23,7 +23,6 @@ import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.table.api.TableException;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.catalog.UniqueConstraint;
-import org.apache.flink.table.factories.DefaultLogTableFactory;
 import org.apache.flink.table.storage.logstore.LogStoreFactory;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.utils.DataTypeUtils;
@@ -48,7 +47,7 @@ import java.util.concurrent.ExecutionException;
 import static org.apache.flink.streaming.connectors.kafka.table.KafkaConnectorOptions.TOPIC;
 import static org.apache.flink.streaming.connectors.kafka.table.KafkaConnectorOptionsUtil.getKafkaProperties;
 
-/** The Kafka {@link DefaultLogTableFactory} implementation. */
+/** The Kafka {@link LogStoreFactory} implementation. */
 public class KafkaLogStoreFactory implements LogStoreFactory {
 
     public static final String IDENTIFIER = "kafka";

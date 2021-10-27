@@ -26,8 +26,6 @@ import org.apache.flink.table.catalog.ObjectIdentifier;
 import org.apache.flink.table.connector.sink.DynamicTableSink;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.DefaultDynamicTableFactory;
-import org.apache.flink.table.factories.DefaultLogTableFactory;
-import org.apache.flink.table.factories.DefaultLogTableFactory.OffsetsRetrieverFactory;
 import org.apache.flink.table.factories.DynamicTableSinkFactory;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
@@ -42,7 +40,6 @@ import java.io.UncheckedIOException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 
 import static org.apache.flink.table.storage.Options.BUCKET;
@@ -148,18 +145,6 @@ public class TableStorageFactory
         if (changeTracking(options)) {
             logStoreFactory.onTableDrop(createLogStoreContext(context));
         }
-    }
-
-    private Optional<OffsetsRetrieverFactory> createOffsetsRetrieverFactory(Context context) {
-        Map<String, String> tableOptions = context.getCatalogTable().getOptions();
-        if (changeTracking(tableOptions)) {
-            DefaultLogTableFactory logTableFactory =
-                    DefaultDynamicTableFactory.discoverDefaultLogFactory(context.getClassLoader());
-            return Optional.of(
-                    logTableFactory.createOffsetsRetrieverFactory(
-                            logContext(context, tableOptions)));
-        }
-        return Optional.empty();
     }
 
     private Context logContext(Context context, Map<String, String> options) {

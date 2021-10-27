@@ -27,6 +27,7 @@ import org.apache.flink.table.catalog.Catalog;
 import org.apache.flink.table.catalog.ObjectIdentifier;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.factories.DefaultDynamicTableFactory;
 import org.apache.flink.table.factories.Factory;
 
 import javax.annotation.Nullable;
@@ -36,7 +37,13 @@ import java.util.Map;
 
 import static org.apache.flink.configuration.description.TextElement.text;
 
-/** */
+/**
+ * Base interface for configuring a default log table connector. The log table is used by {@link
+ * DefaultDynamicTableFactory}.
+ *
+ * <p>Log tables are for processing only unbounded data. Support streaming reading and streaming
+ * writing.
+ */
 public interface LogStoreFactory extends Factory {
 
     /** Notifies the listener that a table creation occurred. */
